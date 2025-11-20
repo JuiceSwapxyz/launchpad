@@ -1,0 +1,52 @@
+{
+  "name": "launchpad",
+  "version": "1.0.0",
+  "description": "Production-ready token launchpad with bonding curve mechanism and automatic DEX graduation for Citrea",
+  "main": "hardhat.config.ts",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:coverage": "hardhat --coverage test",
+    "test:gas": "hardhat --gas-stats test",
+    "clean": "hardhat clean",
+    "node": "hardhat node",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network citreaTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network citreaMainnet"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JuiceSwapxyz/launchpad.git"
+  },
+  "keywords": [
+    "launchpad",
+    "bonding-curve",
+    "citrea",
+    "dex",
+    "pump-fun",
+    "token-factory",
+    "uniswap-v2",
+    "zkEVM",
+    "bitcoin"
+  ],
+  "author": "JuiceSwap",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JuiceSwapxyz/launchpad/issues"
+  },
+  "homepage": "https://github.com/JuiceSwapxyz/launchpad#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.1",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.10.1",
+    "hardhat": "^3.0.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "type": "module",
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "@uniswap/v2-core": "^1.0.1",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0"
+  }
+}
