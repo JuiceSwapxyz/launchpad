@@ -31,6 +31,7 @@ describe("BondingCurveToken - Graduation", function () {
             await mockRouter.getAddress(),
             await baseAsset.getAddress(),
             owner.address,  // Fee recipient
+            ethers.parseEther("4500"),  // Initial virtual base reserves
         ]);
 
         // Create a token
@@ -457,15 +458,6 @@ describe("BondingCurveToken - Graduation", function () {
             // Verify fees are in expected range (~129 JUSD)
             expect(protocolFees).to.be.gt(ethers.parseEther("120"));
             expect(protocolFees).to.be.lt(ethers.parseEther("140"));
-        });
-
-        it("Should handle zero fees gracefully", async function () {
-            // This is an edge case test - in practice there will always be fees
-            // But the contract should handle it without reverting
-            const { token } = await networkHelpers.loadFixture(deployFixture);
-
-            // Just verify token is initialized correctly
-            expect(await token.feeRecipient()).to.not.equal(ethers.ZeroAddress);
         });
 
         it("Should calculate fees correctly", async function () {

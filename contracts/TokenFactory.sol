@@ -28,6 +28,9 @@ contract TokenFactory is Ownable, Pausable {
     /// @notice Address that receives protocol fees from token graduations
     address public feeRecipient;
 
+    /// @notice Initial virtual base reserves for all new tokens (configurable)
+    uint256 public initialVirtualBaseReserves;
+
     /// @notice Array of all deployed token addresses
     address[] public allTokens;
 
@@ -59,13 +62,17 @@ contract TokenFactory is Ownable, Pausable {
      * @param name Token name
      * @param symbol Token symbol
      * @param baseAsset Address of the base asset (e.g., WcBTC)
+     * @param initialVirtualBaseReserves Initial virtual base reserves for bonding curve
+     * @param feeRecipient Address that will receive protocol fees at graduation
      */
     event TokenCreated(
         address indexed token,
         address indexed creator,
         string name,
         string symbol,
-        address baseAsset
+        address baseAsset,
+        uint256 initialVirtualBaseReserves,
+        address feeRecipient
     );
 
     /**
@@ -78,12 +85,23 @@ contract TokenFactory is Ownable, Pausable {
         address indexed newRecipient
     );
 
+    /**
+     * @notice Emitted when initial virtual base reserves setting is updated
+     * @param oldValue Previous value
+     * @param newValue New value
+     */
+    event InitialVirtualBaseReservesUpdated(
+        uint256 oldValue,
+        uint256 newValue
+    );
+
     /* ========== ERRORS ========== */
 
     error InvalidImplementation();
     error InvalidRouter();
     error InvalidBaseAsset();
     error InvalidFeeRecipient();
+    error InvalidVirtualBaseReserves();
     error InvalidName();
     error InvalidSymbol();
 
@@ -95,22 +113,26 @@ contract TokenFactory is Ownable, Pausable {
      * @param _uniswapV2Router Address of Uniswap V2 Router for graduation
      * @param _baseAsset Address of the base asset all tokens will trade against (e.g., JUSD)
      * @param _feeRecipient Address that receives protocol fees from token graduations
+     * @param _initialVirtualBaseReserves Initial virtual base reserves for pricing (must be > 0)
      */
     constructor(
         address _implementation,
         address _uniswapV2Router,
         address _baseAsset,
-        address _feeRecipient
+        address _feeRecipient,
+        uint256 _initialVirtualBaseReserves
     ) Ownable(msg.sender) {
         if (_implementation == address(0)) revert InvalidImplementation();
         if (_uniswapV2Router == address(0)) revert InvalidRouter();
         if (_baseAsset == address(0)) revert InvalidBaseAsset();
         if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
+        if (_initialVirtualBaseReserves == 0) revert InvalidVirtualBaseReserves();
 
         implementation = _implementation;
         uniswapV2Router = _uniswapV2Router;
         baseAsset = _baseAsset;
         feeRecipient = _feeRecipient;
+        initialVirtualBaseReserves = _initialVirtualBaseReserves;
     }
 
     /* ========== EXTERNAL FUNCTIONS ========== */
@@ -140,7 +162,8 @@ contract TokenFactory is Ownable, Pausable {
             baseAsset,
             address(this),
             uniswapV2Router,
-            feeRecipient
+            feeRecipient,
+            initialVirtualBaseReserves
         );
 
         // Store token information
@@ -154,8 +177,16 @@ contract TokenFactory is Ownable, Pausable {
         // Add to tokens array
         allTokens.push(token);
 
-        // Emit event
-        emit TokenCreated(token, msg.sender, name, symbol, baseAsset);
+        // Emit event with complete deployment configuration
+        emit TokenCreated(
+            token,
+            msg.sender,
+            name,
+            symbol,
+            baseAsset,
+            initialVirtualBaseReserves,
+            feeRecipient
+        );
     }
 
     /**
@@ -186,6 +217,20 @@ contract TokenFactory is Ownable, Pausable {
         feeRecipient = _feeRecipient;
 
         emit FeeRecipientUpdated(oldRecipient, _feeRecipient);
+    }
+
+    /**
+     * @notice Updates the initial virtual base reserves for new tokens
+     * @dev Only owner can update. Applies only to NEW tokens created after this call.
+     * @param _initialVirtualBaseReserves New initial virtual base reserves value (must be > 0)
+     */
+    function setInitialVirtualBaseReserves(uint256 _initialVirtualBaseReserves) external onlyOwner {
+        if (_initialVirtualBaseReserves == 0) revert InvalidVirtualBaseReserves();
+
+        uint256 oldValue = initialVirtualBaseReserves;
+        initialVirtualBaseReserves = _initialVirtualBaseReserves;
+
+        emit InitialVirtualBaseReservesUpdated(oldValue, _initialVirtualBaseReserves);
     }
 
     /* ========== VIEW FUNCTIONS ========== */

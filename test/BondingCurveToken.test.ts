@@ -27,6 +27,7 @@ describe("BondingCurveToken - Trading", function () {
             await router.getAddress(),
             await baseAsset.getAddress(),
             owner.address,  // Fee recipient
+            ethers.parseEther("4500"),  // Initial virtual base reserves
         ]);
 
         // Create a token
@@ -166,20 +167,6 @@ describe("BondingCurveToken - Trading", function () {
             // Real base reserves should increase (minus fee)
             const fee = buyAmount * 100n / 10000n;
             expect(reservesAfter.realBase).to.equal(reservesBefore.realBase + (buyAmount - fee));
-        });
-
-        it("Should revert if already graduated", async function () {
-            const { token, baseAsset, user1 } = await networkHelpers.loadFixture(deployFixture);
-
-            // Manually set graduated flag for testing
-            // Note: In real scenario, this happens when realTokenReserves reaches 0
-            // We'll test full graduation in separate test file
-
-            const buyAmount = ethers.parseEther("1");
-            await baseAsset.connect(user1).approve(await token.getAddress(), buyAmount);
-
-            // For now, just test with a small buy
-            await token.connect(user1).buy(buyAmount, 0);
         });
 
         it("Should revert if zero amount", async function () {

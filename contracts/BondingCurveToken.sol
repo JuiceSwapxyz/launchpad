@@ -23,9 +23,6 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     /// @notice Initial virtual token reserves for pricing
     uint256 public constant INITIAL_VIRTUAL_TOKEN_RESERVES = 1_073_000_000e18;
 
-    /// @notice Initial virtual base asset reserves for pricing (4,500 JUSD - matches ~30 SOL USD value)
-    uint256 public constant INITIAL_VIRTUAL_BASE_RESERVES = 4_500 ether;
-
     /// @notice Real tokens available for bonding curve sales
     uint256 public constant INITIAL_REAL_TOKEN_RESERVES = 793_100_000e18;
 
@@ -133,6 +130,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     error InvalidBaseAsset();
     error InvalidRouter();
     error InvalidFeeRecipient();
+    error InvalidVirtualBaseReserves();
     error ZeroAmount();
     error InsufficientOutput();
     error InsufficientInput();
@@ -163,6 +161,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
      * @param factory_ Address of the factory contract
      * @param uniswapV2Router_ Address of Uniswap V2 Router
      * @param feeRecipient_ Address that receives protocol fees at graduation
+     * @param initialVirtualBase_ Initial virtual base reserves for pricing
      */
     function initialize(
         string memory name_,
@@ -170,7 +169,8 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         address baseAsset_,
         address factory_,
         address uniswapV2Router_,
-        address feeRecipient_
+        address feeRecipient_,
+        uint256 initialVirtualBase_
     ) external {
         // Prevent re-initialization (factory is set to address(1) in implementation constructor)
         if (factory != address(0)) revert AlreadyInitialized();
@@ -178,6 +178,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         if (baseAsset_ == address(0)) revert InvalidBaseAsset();
         if (uniswapV2Router_ == address(0)) revert InvalidRouter();
         if (feeRecipient_ == address(0)) revert InvalidFeeRecipient();
+        if (initialVirtualBase_ == 0) revert InvalidVirtualBaseReserves();
 
         // Set state variables
         factory = factory_;
@@ -191,7 +192,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
 
         // Initialize reserves
         virtualTokenReserves = INITIAL_VIRTUAL_TOKEN_RESERVES;
-        virtualBaseReserves = INITIAL_VIRTUAL_BASE_RESERVES;
+        virtualBaseReserves = initialVirtualBase_;
         realTokenReserves = INITIAL_REAL_TOKEN_RESERVES;
         realBaseReserves = 0;
 

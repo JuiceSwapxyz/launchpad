@@ -28,6 +28,7 @@ describe("TokenFactory", function () {
             await router.getAddress(),
             await baseAsset.getAddress(),
             owner.address,  // Fee recipient set to owner for testing
+            ethers.parseEther("4500"),  // Initial virtual base reserves
         ]);
 
         return { factory, implementation, baseAsset, router, owner, user1, user2 };
@@ -67,6 +68,7 @@ describe("TokenFactory", function () {
                     await router.getAddress(),
                     await baseAsset.getAddress(),
                     owner.address,
+                    ethers.parseEther("4500"),
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -82,6 +84,7 @@ describe("TokenFactory", function () {
                     ethers.ZeroAddress,
                     await baseAsset.getAddress(),
                     owner.address,
+                    ethers.parseEther("4500"),
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -97,6 +100,7 @@ describe("TokenFactory", function () {
                     await router.getAddress(),
                     ethers.ZeroAddress,
                     owner.address,
+                    ethers.parseEther("4500"),
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -117,6 +121,7 @@ describe("TokenFactory", function () {
                     await router.getAddress(),
                     await baseAsset.getAddress(),
                     ethers.ZeroAddress,
+                    ethers.parseEther("4500"),
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -138,7 +143,9 @@ describe("TokenFactory", function () {
                     owner.address,
                     "Test Token",
                     "TEST",
-                    await baseAsset.getAddress()
+                    await baseAsset.getAddress(),
+                    ethers.parseEther("4500"),  // initialVirtualBaseReserves
+                    owner.address               // feeRecipient
                 );
 
             expect(await factory.allTokensLength()).to.equal(1);
@@ -357,8 +364,110 @@ describe("TokenFactory", function () {
             const receipt = await tx.wait();
             const gasUsed = receipt?.gasUsed ?? 0n;
 
-            // Expect gas usage to be reasonable (< 500k for proxy deployment)
-            expect(gasUsed).to.be.lt(500000);
+            // Expect gas usage to be reasonable (< 520k for proxy deployment with extra param)
+            expect(gasUsed).to.be.lt(520000);
+        });
+    });
+
+    describe("Initial Virtual Base Reserves Management", function () {
+        it("Should set the correct initial virtual base reserves in constructor", async function () {
+            const { factory } = await networkHelpers.loadFixture(deployFixture);
+            expect(await factory.initialVirtualBaseReserves()).to.equal(ethers.parseEther("4500"));
+        });
+
+        it("Should revert if initial virtual base reserves is zero in constructor", async function () {
+            const { implementation, router, baseAsset, owner } = await networkHelpers.loadFixture(deployFixture);
+            await expect(
+                ethers.deployContract("TokenFactory", [
+                    await implementation.getAddress(),
+                    await router.getAddress(),
+                    await baseAsset.getAddress(),
+                    owner.address,
+                    0,  // Zero virtual base reserves
+                ])
+            ).to.be.revertedWithCustomError(
+                await ethers.getContractFactory("TokenFactory"),
+                "InvalidVirtualBaseReserves"
+            );
+        });
+
+        it("Should allow owner to update initial virtual base reserves", async function () {
+            const { factory, owner } = await networkHelpers.loadFixture(deployFixture);
+
+            const newValue = ethers.parseEther("5000");
+            await expect(factory.connect(owner).setInitialVirtualBaseReserves(newValue))
+                .to.emit(factory, "InitialVirtualBaseReservesUpdated")
+                .withArgs(ethers.parseEther("4500"), newValue);
+
+            expect(await factory.initialVirtualBaseReserves()).to.equal(newValue);
+        });
+
+        it("Should revert if non-owner tries to update initial virtual base reserves", async function () {
+            const { factory, user1 } = await networkHelpers.loadFixture(deployFixture);
+
+            await expect(
+                factory.connect(user1).setInitialVirtualBaseReserves(ethers.parseEther("5000"))
+            ).to.be.revertedWithCustomError(factory, "OwnableUnauthorizedAccount");
+        });
+
+        it("Should revert when setting initial virtual base reserves to zero", async function () {
+            const { factory, owner } = await networkHelpers.loadFixture(deployFixture);
+
+            await expect(
+                factory.connect(owner).setInitialVirtualBaseReserves(0)
+            ).to.be.revertedWithCustomError(factory, "InvalidVirtualBaseReserves");
+        });
+
+        it("Should emit event when initial virtual base reserves is updated", async function () {
+            const { factory, owner } = await networkHelpers.loadFixture(deployFixture);
+
+            const oldValue = ethers.parseEther("4500");
+            const newValue = ethers.parseEther("6000");
+
+            await expect(factory.connect(owner).setInitialVirtualBaseReserves(newValue))
+                .to.emit(factory, "InitialVirtualBaseReservesUpdated")
+                .withArgs(oldValue, newValue);
+        });
+
+        it("Should not affect existing tokens when updated", async function () {
+            const { factory, owner, baseAsset } = await networkHelpers.loadFixture(deployFixture);
+
+            // Create a token with initial setting (4500)
+            const tx1 = await factory.createToken("Token1", "TK1");
+            const token1Address = await factory.getToken(0);
+
+            // Check token1 creation event has 4500
+            await expect(tx1)
+                .to.emit(factory, "TokenCreated")
+                .withArgs(
+                    token1Address,
+                    owner.address,
+                    "Token1",
+                    "TK1",
+                    await baseAsset.getAddress(),
+                    ethers.parseEther("4500"),  // initialVirtualBaseReserves
+                    owner.address               // feeRecipient
+                );
+
+            // Update factory setting to 6000
+            await factory.connect(owner).setInitialVirtualBaseReserves(ethers.parseEther("6000"));
+
+            // Create a new token with new setting (6000)
+            const tx2 = await factory.createToken("Token2", "TK2");
+            const token2Address = await factory.getToken(1);
+
+            // Token2 creation event should have 6000
+            await expect(tx2)
+                .to.emit(factory, "TokenCreated")
+                .withArgs(
+                    token2Address,
+                    owner.address,
+                    "Token2",
+                    "TK2",
+                    await baseAsset.getAddress(),
+                    ethers.parseEther("6000"),  // New initialVirtualBaseReserves
+                    owner.address               // feeRecipient
+                );
         });
     });
 });
