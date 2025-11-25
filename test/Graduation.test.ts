@@ -14,6 +14,10 @@ describe("BondingCurveToken - Graduation", function () {
 
         // Deploy mock Uniswap V2 components
         const mockFactory = await ethers.deployContract("MockUniswapV2Factory");
+
+        // Get init code hash from mock factory (uses CREATE2 for deterministic addresses)
+        const initCodeHash = await mockFactory.INIT_CODE_PAIR_HASH();
+
         const mockRouter = await ethers.deployContract("MockUniswapV2Router", [
             await mockFactory.getAddress(),
             await baseAsset.getAddress(),
@@ -25,13 +29,14 @@ describe("BondingCurveToken - Graduation", function () {
         // Deploy implementation
         const implementation = await ethers.deployContract("BondingCurveToken");
 
-        // Deploy factory with base asset and fee recipient
+        // Deploy factory with base asset, fee recipient, and init code hash
         const tokenFactory = await ethers.deployContract("TokenFactory", [
             await implementation.getAddress(),
             await mockRouter.getAddress(),
             await baseAsset.getAddress(),
             owner.address,  // Fee recipient
             ethers.parseEther("4500"),  // Initial virtual base reserves
+            initCodeHash,  // Init code hash for pair address computation
         ]);
 
         // Create a token
@@ -44,7 +49,7 @@ describe("BondingCurveToken - Graduation", function () {
         await baseAsset.mint(user1.address, mintAmount);
         await baseAsset.mint(user2.address, mintAmount);
 
-        return { token, baseAsset, mockRouter, mockFactory, tokenFactory, owner, user1, user2 };
+        return { token, baseAsset, mockRouter, mockFactory, initCodeHash, tokenFactory, owner, user1, user2 };
     }
 
     describe("Graduation Trigger", function () {
@@ -235,6 +240,37 @@ describe("BondingCurveToken - Graduation", function () {
 
             const v2Pair = await token.v2Pair();
             expect(v2Pair).to.not.equal(ethers.ZeroAddress);
+        });
+
+        it("Should allow transfers to Uniswap pair after graduation", async function () {
+            const { token, user1 } = await networkHelpers.loadFixture(graduateTokenFixture);
+
+            // User1 should have tokens from buying during graduation
+            const balance = await token.balanceOf(user1.address);
+            expect(balance).to.be.gt(0);
+
+            // Transfer to pair should now work (for trading on Uniswap)
+            const pairAddress = await token.uniswapPair();
+            const transferAmount = balance / 10n;
+
+            // Execute transfer (no expect wrapper, just verify it doesn't revert)
+            await token.connect(user1).transfer(pairAddress, transferAmount);
+
+            // Verify token was transferred
+            const pairBalance = await token.balanceOf(pairAddress);
+            expect(pairBalance).to.be.gte(transferAmount);
+        });
+
+        it("Should match pre-computed pair with created pair", async function () {
+            const { token, mockFactory, baseAsset } = await networkHelpers.loadFixture(graduateTokenFixture);
+
+            // Pre-computed pair address
+            const precomputedPair = await token.uniswapPair();
+
+            // Actual pair created during graduation
+            const actualPair = await mockFactory.getPair(await token.getAddress(), await baseAsset.getAddress());
+
+            expect(precomputedPair).to.equal(actualPair);
         });
     });
 

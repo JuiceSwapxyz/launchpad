@@ -23,7 +23,11 @@ contract TokenFactory is Ownable, Pausable {
     address public immutable uniswapV2Router;
 
     /// @notice Base asset that all tokens will trade against (e.g., JUSD)
+    /// @dev NOTE: If a fee-on-transfer token is used, graduation will revert due to reserve mismatch.
     address public immutable baseAsset;
+
+    /// @notice Init code hash for Uniswap V2 pair address computation (chain-specific)
+    bytes32 public immutable initCodeHash;
 
     /// @notice Address that receives protocol fees from token graduations
     address public feeRecipient;
@@ -102,6 +106,7 @@ contract TokenFactory is Ownable, Pausable {
     error InvalidBaseAsset();
     error InvalidFeeRecipient();
     error InvalidVirtualBaseReserves();
+    error InvalidInitCodeHash();
     error InvalidName();
     error InvalidSymbol();
 
@@ -114,25 +119,29 @@ contract TokenFactory is Ownable, Pausable {
      * @param _baseAsset Address of the base asset all tokens will trade against (e.g., JUSD)
      * @param _feeRecipient Address that receives protocol fees from token graduations
      * @param _initialVirtualBaseReserves Initial virtual base reserves for pricing (must be > 0)
+     * @param _initCodeHash Init code hash for Uniswap V2 pair address computation
      */
     constructor(
         address _implementation,
         address _uniswapV2Router,
         address _baseAsset,
         address _feeRecipient,
-        uint256 _initialVirtualBaseReserves
+        uint256 _initialVirtualBaseReserves,
+        bytes32 _initCodeHash
     ) Ownable(msg.sender) {
         if (_implementation == address(0)) revert InvalidImplementation();
         if (_uniswapV2Router == address(0)) revert InvalidRouter();
         if (_baseAsset == address(0)) revert InvalidBaseAsset();
         if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
         if (_initialVirtualBaseReserves == 0) revert InvalidVirtualBaseReserves();
+        if (_initCodeHash == bytes32(0)) revert InvalidInitCodeHash();
 
         implementation = _implementation;
         uniswapV2Router = _uniswapV2Router;
         baseAsset = _baseAsset;
         feeRecipient = _feeRecipient;
         initialVirtualBaseReserves = _initialVirtualBaseReserves;
+        initCodeHash = _initCodeHash;
     }
 
     /* ========== EXTERNAL FUNCTIONS ========== */
@@ -163,7 +172,8 @@ contract TokenFactory is Ownable, Pausable {
             address(this),
             uniswapV2Router,
             feeRecipient,
-            initialVirtualBaseReserves
+            initialVirtualBaseReserves,
+            initCodeHash
         );
 
         // Store token information

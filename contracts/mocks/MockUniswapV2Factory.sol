@@ -6,8 +6,13 @@ import "./MockUniswapV2Pair.sol";
 /**
  * @title MockUniswapV2Factory
  * @notice Mock Uniswap V2 Factory for testing
+ * @dev Uses CREATE2 for deterministic pair addresses (matches real Uniswap V2 behavior)
  */
 contract MockUniswapV2Factory {
+    /// @notice Init code hash for pair address computation
+    /// @dev Computed as keccak256(type(MockUniswapV2Pair).creationCode)
+    bytes32 public constant INIT_CODE_PAIR_HASH = keccak256(type(MockUniswapV2Pair).creationCode);
+
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 
@@ -19,8 +24,9 @@ contract MockUniswapV2Factory {
         require(token0 != address(0), "ZERO_ADDRESS");
         require(getPair[token0][token1] == address(0), "PAIR_EXISTS");
 
-        // Deploy new pair
-        MockUniswapV2Pair newPair = new MockUniswapV2Pair();
+        // Deploy new pair using CREATE2 for deterministic address
+        bytes32 salt = keccak256(abi.encodePacked(token0, token1));
+        MockUniswapV2Pair newPair = new MockUniswapV2Pair{salt: salt}();
         pair = address(newPair);
 
         // Store pair

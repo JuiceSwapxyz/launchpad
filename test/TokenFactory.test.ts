@@ -13,25 +13,32 @@ describe("TokenFactory", function () {
         // Deploy mock base asset (WcBTC)
         const baseAsset = await ethers.deployContract("MockERC20", ["Wrapped cBTC", "WcBTC"]);
 
-        // Deploy mock router
+        // Deploy mock V2 factory (uses CREATE2 for deterministic pair addresses)
+        const v2Factory = await ethers.deployContract("MockUniswapV2Factory");
+
+        // Get init code hash from mock factory
+        const initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+
+        // Deploy mock router with factory address
         const router = await ethers.deployContract("MockUniswapV2Router", [
-            ethers.ZeroAddress,
+            await v2Factory.getAddress(),
             ethers.ZeroAddress,
         ]);
 
         // Deploy implementation contract
         const implementation = await ethers.deployContract("BondingCurveToken");
 
-        // Deploy factory with base asset and fee recipient
+        // Deploy factory with base asset, fee recipient, and init code hash
         const factory = await ethers.deployContract("TokenFactory", [
             await implementation.getAddress(),
             await router.getAddress(),
             await baseAsset.getAddress(),
             owner.address,  // Fee recipient set to owner for testing
             ethers.parseEther("4500"),  // Initial virtual base reserves
+            initCodeHash,  // Init code hash for pair address computation
         ]);
 
-        return { factory, implementation, baseAsset, router, owner, user1, user2 };
+        return { factory, implementation, baseAsset, router, v2Factory, initCodeHash, owner, user1, user2 };
     }
 
     describe("Deployment", function () {
@@ -61,7 +68,7 @@ describe("TokenFactory", function () {
         });
 
         it("Should revert if implementation is zero address", async function () {
-            const { router, baseAsset, owner } = await networkHelpers.loadFixture(deployFixture);
+            const { router, baseAsset, owner, initCodeHash } = await networkHelpers.loadFixture(deployFixture);
             await expect(
                 ethers.deployContract("TokenFactory", [
                     ethers.ZeroAddress,
@@ -69,6 +76,7 @@ describe("TokenFactory", function () {
                     await baseAsset.getAddress(),
                     owner.address,
                     ethers.parseEther("4500"),
+                    initCodeHash,
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -77,7 +85,7 @@ describe("TokenFactory", function () {
         });
 
         it("Should revert if router is zero address", async function () {
-            const { implementation, baseAsset, owner } = await networkHelpers.loadFixture(deployFixture);
+            const { implementation, baseAsset, owner, initCodeHash } = await networkHelpers.loadFixture(deployFixture);
             await expect(
                 ethers.deployContract("TokenFactory", [
                     await implementation.getAddress(),
@@ -85,6 +93,7 @@ describe("TokenFactory", function () {
                     await baseAsset.getAddress(),
                     owner.address,
                     ethers.parseEther("4500"),
+                    initCodeHash,
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -93,7 +102,7 @@ describe("TokenFactory", function () {
         });
 
         it("Should revert if base asset is zero address", async function () {
-            const { implementation, router, owner } = await networkHelpers.loadFixture(deployFixture);
+            const { implementation, router, owner, initCodeHash } = await networkHelpers.loadFixture(deployFixture);
             await expect(
                 ethers.deployContract("TokenFactory", [
                     await implementation.getAddress(),
@@ -101,6 +110,7 @@ describe("TokenFactory", function () {
                     ethers.ZeroAddress,
                     owner.address,
                     ethers.parseEther("4500"),
+                    initCodeHash,
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
@@ -114,7 +124,7 @@ describe("TokenFactory", function () {
         });
 
         it("Should revert if fee recipient is zero address", async function () {
-            const { implementation, router, baseAsset } = await networkHelpers.loadFixture(deployFixture);
+            const { implementation, router, baseAsset, initCodeHash } = await networkHelpers.loadFixture(deployFixture);
             await expect(
                 ethers.deployContract("TokenFactory", [
                     await implementation.getAddress(),
@@ -122,10 +132,33 @@ describe("TokenFactory", function () {
                     await baseAsset.getAddress(),
                     ethers.ZeroAddress,
                     ethers.parseEther("4500"),
+                    initCodeHash,
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),
                 "InvalidFeeRecipient"
+            );
+        });
+
+        it("Should set the correct init code hash", async function () {
+            const { factory, initCodeHash } = await networkHelpers.loadFixture(deployFixture);
+            expect(await factory.initCodeHash()).to.equal(initCodeHash);
+        });
+
+        it("Should revert if init code hash is zero", async function () {
+            const { implementation, router, baseAsset, owner } = await networkHelpers.loadFixture(deployFixture);
+            await expect(
+                ethers.deployContract("TokenFactory", [
+                    await implementation.getAddress(),
+                    await router.getAddress(),
+                    await baseAsset.getAddress(),
+                    owner.address,
+                    ethers.parseEther("4500"),
+                    ethers.ZeroHash,
+                ])
+            ).to.be.revertedWithCustomError(
+                await ethers.getContractFactory("TokenFactory"),
+                "InvalidInitCodeHash"
             );
         });
     });
@@ -376,7 +409,7 @@ describe("TokenFactory", function () {
         });
 
         it("Should revert if initial virtual base reserves is zero in constructor", async function () {
-            const { implementation, router, baseAsset, owner } = await networkHelpers.loadFixture(deployFixture);
+            const { implementation, router, baseAsset, owner, initCodeHash } = await networkHelpers.loadFixture(deployFixture);
             await expect(
                 ethers.deployContract("TokenFactory", [
                     await implementation.getAddress(),
@@ -384,6 +417,7 @@ describe("TokenFactory", function () {
                     await baseAsset.getAddress(),
                     owner.address,
                     0,  // Zero virtual base reserves
+                    initCodeHash,
                 ])
             ).to.be.revertedWithCustomError(
                 await ethers.getContractFactory("TokenFactory"),

@@ -12,22 +12,29 @@ describe("BondingCurveToken - Trading", function () {
         // Deploy mock base asset (WcBTC)
         const baseAsset = await ethers.deployContract("MockERC20", ["Wrapped cBTC", "WcBTC"]);
 
-        // Deploy mock router
+        // Deploy mock V2 factory (uses CREATE2 for deterministic pair addresses)
+        const v2Factory = await ethers.deployContract("MockUniswapV2Factory");
+
+        // Get init code hash from mock factory
+        const initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+
+        // Deploy mock router with factory address
         const router = await ethers.deployContract("MockUniswapV2Router", [
-            ethers.ZeroAddress,
+            await v2Factory.getAddress(),
             ethers.ZeroAddress,
         ]);
 
         // Deploy implementation
         const implementation = await ethers.deployContract("BondingCurveToken");
 
-        // Deploy factory with base asset and fee recipient
+        // Deploy factory with base asset, fee recipient, and init code hash
         const factory = await ethers.deployContract("TokenFactory", [
             await implementation.getAddress(),
             await router.getAddress(),
             await baseAsset.getAddress(),
             owner.address,  // Fee recipient
             ethers.parseEther("4500"),  // Initial virtual base reserves
+            initCodeHash,  // Init code hash for pair address computation
         ]);
 
         // Create a token
@@ -41,7 +48,7 @@ describe("BondingCurveToken - Trading", function () {
         await baseAsset.mint(user2.address, mintAmount);
         await baseAsset.mint(user3.address, mintAmount);
 
-        return { token, baseAsset, factory, router, owner, user1, user2, user3 };
+        return { token, baseAsset, factory, router, v2Factory, initCodeHash, owner, user1, user2, user3 };
     }
 
     describe("Initialization", function () {
@@ -347,6 +354,56 @@ describe("BondingCurveToken - Trading", function () {
 
             const actualBaseReceived = baseAfter - baseBefore;
             expect(actualBaseReceived).to.equal(quote);
+        });
+    });
+
+    describe("Front-Running Protection", function () {
+        it("Should block transfers to Uniswap pair before graduation", async function () {
+            const { token, baseAsset, user1 } = await networkHelpers.loadFixture(deployFixture);
+
+            // First buy some tokens
+            const buyAmount = ethers.parseEther("10");
+            await baseAsset.connect(user1).approve(await token.getAddress(), buyAmount);
+            await token.connect(user1).buy(buyAmount, 0);
+
+            // Try to transfer tokens to the pre-computed pair address
+            const pairAddress = await token.uniswapPair();
+            const transferAmount = ethers.parseEther("100");
+
+            await expect(
+                token.connect(user1).transfer(pairAddress, transferAmount)
+            ).to.be.revertedWithCustomError(token, "TransferToUniswapPairBlocked");
+        });
+
+        it("Should compute correct pair address", async function () {
+            const { token, v2Factory, baseAsset } = await networkHelpers.loadFixture(deployFixture);
+
+            // The pre-computed pair address should match what the factory would create
+            const precomputedPair = await token.uniswapPair();
+            expect(precomputedPair).to.not.equal(ethers.ZeroAddress);
+
+            // Create the pair manually to verify addresses match
+            await v2Factory.createPair(await token.getAddress(), await baseAsset.getAddress());
+            const actualPair = await v2Factory.getPair(await token.getAddress(), await baseAsset.getAddress());
+
+            expect(precomputedPair).to.equal(actualPair);
+        });
+
+        it("Should allow transfers to other addresses before graduation", async function () {
+            const { token, baseAsset, user1, user2 } = await networkHelpers.loadFixture(deployFixture);
+
+            // Buy some tokens
+            const buyAmount = ethers.parseEther("10");
+            await baseAsset.connect(user1).approve(await token.getAddress(), buyAmount);
+            await token.connect(user1).buy(buyAmount, 0);
+
+            const balance = await token.balanceOf(user1.address);
+            const transferAmount = balance / 2n;
+
+            // Transfer to another user should work (no expect, just execute)
+            await token.connect(user1).transfer(user2.address, transferAmount);
+
+            expect(await token.balanceOf(user2.address)).to.equal(transferAmount);
         });
     });
 

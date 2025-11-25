@@ -76,6 +76,9 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     /// @notice Uniswap V2 pair address (set after graduation)
     address public v2Pair;
 
+    /// @notice Pre-computed Uniswap V2 pair address (for front-running protection)
+    address public uniswapPair;
+
     /* ========== EVENTS ========== */
 
     /**
@@ -141,6 +144,8 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     error NotGraduated();
     error TransferFailed();
     error InsufficientReserves();
+    error TransferToUniswapPairBlocked();
+    error InvalidInitCodeHash();
 
     /* ========== INITIALIZATION ========== */
 
@@ -162,6 +167,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
      * @param uniswapV2Router_ Address of Uniswap V2 Router
      * @param feeRecipient_ Address that receives protocol fees at graduation
      * @param initialVirtualBase_ Initial virtual base reserves for pricing
+     * @param initCodeHash_ Init code hash for Uniswap V2 pair address computation
      */
     function initialize(
         string memory name_,
@@ -170,7 +176,8 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         address factory_,
         address uniswapV2Router_,
         address feeRecipient_,
-        uint256 initialVirtualBase_
+        uint256 initialVirtualBase_,
+        bytes32 initCodeHash_
     ) external {
         // Prevent re-initialization (factory is set to address(1) in implementation constructor)
         if (factory != address(0)) revert AlreadyInitialized();
@@ -179,6 +186,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         if (uniswapV2Router_ == address(0)) revert InvalidRouter();
         if (feeRecipient_ == address(0)) revert InvalidFeeRecipient();
         if (initialVirtualBase_ == 0) revert InvalidVirtualBaseReserves();
+        if (initCodeHash_ == bytes32(0)) revert InvalidInitCodeHash();
 
         // Set state variables
         factory = factory_;
@@ -189,6 +197,18 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         // Set name and symbol
         _tokenName = name_;
         _tokenSymbol = symbol_;
+
+        // Compute Uniswap V2 pair address deterministically (for front-running protection)
+        address v2Factory = IUniswapV2Router02(uniswapV2Router_).factory();
+        (address token0, address token1) = address(this) < baseAsset_
+            ? (address(this), baseAsset_)
+            : (baseAsset_, address(this));
+        uniswapPair = address(uint160(uint256(keccak256(abi.encodePacked(
+            hex'ff',
+            v2Factory,
+            keccak256(abi.encodePacked(token0, token1)),
+            initCodeHash_
+        )))));
 
         // Initialize reserves
         virtualTokenReserves = INITIAL_VIRTUAL_TOKEN_RESERVES;
@@ -437,6 +457,20 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     /* ========== INTERNAL FUNCTIONS ========== */
 
     /**
+     * @notice ERC20 transfer hook - blocks transfers to Uniswap pair before graduation
+     * @dev Prevents front-running attacks that could DoS graduation by seeding the pair with wrong ratio
+     * @param from Address tokens are transferred from
+     * @param to Address tokens are transferred to
+     * @param value Amount of tokens transferred
+     */
+    function _update(address from, address to, uint256 value) internal override {
+        if (!graduated && to == uniswapPair) {
+            revert TransferToUniswapPairBlocked();
+        }
+        super._update(from, to, value);
+    }
+
+    /**
      * @notice Update reserves after a trade
      * @param newVirtualTokenReserves New virtual token reserves
      * @param newVirtualBaseReserves New virtual base reserves
@@ -463,6 +497,8 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         if (baseDelta < 0) {
             realBaseReserves -= uint256(-baseDelta);
         } else {
+            // Note: Assumes 1:1 transfer. If baseAsset has fees-on-transfer, this value
+            // will drift higher than the actual contract balance, breaking graduation!
             realBaseReserves += uint256(baseDelta);
         }
     }
