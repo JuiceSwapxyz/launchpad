@@ -13,7 +13,10 @@
     "deploy:testnet": "hardhat run scripts/deploy.ts --network citreaTestnet",
     "deploy:mainnet": "hardhat run scripts/deploy.ts --network citreaMainnet",
     "deploy:fork": "FORK_CITREA=true hardhat run scripts/deploy.ts --network hardhat",
-    "test:fork": "FORK_CITREA=true hardhat test"
+    "test:fork": "FORK_CITREA=true hardhat test --network hardhat",
+    "test:integration": "hardhat test test/integration/*.test.ts",
+    "test:integration:fork": "FORK_CITREA=true hardhat test test/integration/*.test.ts --network hardhat",
+    "test:integration:testnet": "hardhat test test/integration/*.test.ts --network citreaTestnet"
   },
   "repository": {
     "type": "git",
@@ -38,11 +41,24 @@
   "homepage": "https://github.com/JuiceSwapxyz/launchpad#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.0",
+    "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition": "^3.0.0",
+    "@nomicfoundation/hardhat-ignition-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-keystore": "^3.0.0",
+    "@nomicfoundation/hardhat-mocha": "^3.0.0",
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.1",
+    "@nomicfoundation/hardhat-typechain": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^3.0.0",
+    "@nomicfoundation/ignition-core": "^3.0.0",
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "^24.10.1",
+    "chai": "^5.1.2",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.14.0",
     "hardhat": "^3.0.15",
+    "mocha": "^11.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },

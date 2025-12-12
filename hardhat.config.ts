@@ -1,8 +1,35 @@
+import "dotenv/config";
 import { defineConfig } from "hardhat/config";
 import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 
 export default defineConfig({
   plugins: [hardhatToolboxMochaEthers],
+  // Citrea chain descriptor with hardfork history for forking support
+  chainDescriptors: {
+    5115: {
+      name: "citrea",
+      chainType: "generic",
+      hardforkHistory: {
+        chainstart: { blockNumber: 0 },
+        homestead: { blockNumber: 0 },
+        tangerineWhistle: { blockNumber: 0 },
+        spuriousDragon: { blockNumber: 0 },
+        byzantium: { blockNumber: 0 },
+        constantinople: { blockNumber: 0 },
+        petersburg: { blockNumber: 0 },
+        istanbul: { blockNumber: 0 },
+        muirGlacier: { blockNumber: 0 },
+        berlin: { blockNumber: 0 },
+        london: { blockNumber: 0 },
+        arrowGlacier: { blockNumber: 0 },
+        grayGlacier: { blockNumber: 0 },
+        merge: { blockNumber: 0 },
+        shanghai: { blockNumber: 0 },
+        cancun: { blockNumber: 0 },
+      },
+      blockExplorers: {},
+    },
+  },
   solidity: {
     version: "0.8.20",
     settings: {
