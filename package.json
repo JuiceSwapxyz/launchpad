@@ -1,5 +1,5 @@
 {
-  "name": "@juiceswap/launchpad",
+  "name": "@juiceswapxyz/launchpad",
   "version": "1.0.0",
   "description": "Production-ready token launchpad with bonding curve mechanism and automatic DEX graduation for Citrea",
   "main": "./dist/index.js",

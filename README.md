@@ -1,11 +1,11 @@
-# @juiceswap/launchpad
+# @juiceswapxyz/launchpad
 
 Token launchpad with bonding curve mechanism and automatic DEX graduation for JuiceSwap on Citrea.
 
 ## Installation
 
 ```bash
-npm install @juiceswap/launchpad
+npm install @juiceswapxyz/launchpad
 ```
 
 ## Overview
@@ -32,7 +32,7 @@ Tokens launch on a constant-product bonding curve. When fully sold, they automat
 ### Usage
 
 ```typescript
-import { TokenFactoryABI, ADDRESS } from '@juiceswap/launchpad';
+import { TokenFactoryABI, ADDRESS } from '@juiceswapxyz/launchpad';
 import { getContract } from 'viem';
 
 const factory = getContract({
