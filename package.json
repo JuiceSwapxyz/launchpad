@@ -1,8 +1,15 @@
 {
-  "name": "launchpad",
+  "name": "@juiceswap/launchpad",
   "version": "1.0.0",
   "description": "Production-ready token launchpad with bonding curve mechanism and automatic DEX graduation for Citrea",
-  "main": "hardhat.config.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "contracts/**/*.sol",
+    "dist/",
+    "exports/"
+  ],
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
@@ -16,7 +23,10 @@
     "test:fork": "FORK_CITREA=true hardhat test --network hardhat",
     "test:integration": "hardhat test test/integration/*.test.ts",
     "test:integration:fork": "FORK_CITREA=true hardhat test test/integration/*.test.ts --network hardhat",
-    "test:integration:testnet": "hardhat test test/integration/*.test.ts --network citreaTestnet"
+    "test:integration:testnet": "hardhat test test/integration/*.test.ts --network citreaTestnet",
+    "ts:export:abis": "npx ts-node ./scripts/exportAbis.ts && prettier --write \"exports/abis/**/*.ts\"",
+    "build": "npm run ts:export:abis && tsup",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -59,13 +69,19 @@
     "ethers": "^6.14.0",
     "hardhat": "^3.0.15",
     "mocha": "^11.0.0",
+    "prettier": "^3.7.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "viem": "^2.41.2"
   },
   "type": "module",
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0"
+  },
+  "peerDependencies": {
+    "viem": ">=2.0.0"
   }
 }

@@ -1,6 +1,12 @@
-# Launchpad
+# @juiceswap/launchpad
 
 Token launchpad with bonding curve mechanism and automatic DEX graduation for JuiceSwap on Citrea.
+
+## Installation
+
+```bash
+npm install @juiceswap/launchpad
+```
 
 ## Overview
 
@@ -9,6 +15,34 @@ Tokens launch on a constant-product bonding curve. When fully sold, they automat
 - All tokens trade against JUSD (Juice Dollar)
 - Graduation creates TOKEN/JUSD pairs on JuiceSwap V2
 - LP tokens burned to `0xdead` (permanent lock)
+
+## Frontend Integration
+
+### Exports
+
+| Export | Description |
+|--------|-------------|
+| `TokenFactoryABI` | ABI for creating tokens and querying factory |
+| `BondingCurveTokenABI` | ABI for buy/sell/graduate operations |
+| `ADDRESS` | Contract addresses by chain ID |
+| `LAUNCHPAD_CONSTANTS` | Protocol constants (supply, reserves, fees) |
+| `getAddresses(chainId)` | Helper to get addresses for a chain |
+| `isChainSupported(chainId)` | Check if chain is supported |
+
+### Usage
+
+```typescript
+import { TokenFactoryABI, ADDRESS } from '@juiceswap/launchpad';
+import { getContract } from 'viem';
+
+const factory = getContract({
+  address: ADDRESS[5115].factory, // Citrea Testnet
+  abi: TokenFactoryABI,
+  client: publicClient,
+});
+
+const hash = await factory.write.createToken(['My Token', 'MTK']);
+```
 
 ## Contracts
 
@@ -67,12 +101,21 @@ contracts/
 ├── BondingCurveToken.sol
 ├── TokenFactory.sol
 └── mocks/                    # Test mocks only
+exports/
+├── index.ts                  # Barrel export
+├── address.config.ts         # Chain addresses
+├── constants.ts              # Protocol constants
+└── abis/
+    ├── TokenFactory.ts
+    └── BondingCurveToken.ts
 test/
 ├── BondingCurveToken.test.ts
 ├── TokenFactory.test.ts
-└── Graduation.test.ts
+├── Graduation.test.ts
+└── integration/              # Fork tests
 scripts/
-└── deploy.ts
+├── deploy.ts
+└── exportAbis.ts
 ```
 
 ## Usage
@@ -96,11 +139,19 @@ INITIAL_VIRTUAL_BASE=4500    # Optional, in JUSD units
 
 ```bash
 npm install
-npm run compile
-npm test
-npm run test:coverage
-npm run deploy:testnet
-npm run deploy:mainnet
+npm run compile          # Compile contracts
+npm test                 # Run unit tests
+npm run test:coverage    # Run with coverage
+npm run test:integration:fork  # Run integration tests on fork
+npm run deploy:testnet   # Deploy to Citrea Testnet
+npm run deploy:mainnet   # Deploy to Citrea Mainnet
+npm run build            # Build npm package (exports ABIs)
+```
+
+### Publishing
+
+```bash
+npm publish --access public
 ```
 
 ## Security
