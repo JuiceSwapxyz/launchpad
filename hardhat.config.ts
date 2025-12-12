@@ -17,6 +17,18 @@ export default defineConfig({
     hardhat: {
       type: "edr-simulated",
       chainType: "generic",
+      chainId: 5115,
+      hardfork: "cancun",
+      initialBaseFeePerGas: 0,
+      mining: {
+        auto: true,
+        interval: 0,
+      },
+      allowBlocksWithSameTimestamp: true,
+      forking: process.env.FORK_CITREA === "true" ? {
+        url: process.env.CITREA_TESTNET_RPC || "https://rpc.testnet.citrea.xyz",
+        enabled: true,
+      } : undefined,
     },
     citreaTestnet: {
       type: "http",
@@ -37,7 +49,9 @@ export default defineConfig({
     cache: "./cache",
     artifacts: "./artifacts",
   },
-  mocha: {
-    timeout: 40000,
+  test: {
+    mocha: {
+      timeout: 40000,
+    },
   },
 });

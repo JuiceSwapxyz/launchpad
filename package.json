@@ -11,7 +11,9 @@
     "clean": "hardhat clean",
     "node": "hardhat node",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network citreaTestnet",
-    "deploy:mainnet": "hardhat run scripts/deploy.ts --network citreaMainnet"
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network citreaMainnet",
+    "deploy:fork": "FORK_CITREA=true hardhat run scripts/deploy.ts --network hardhat",
+    "test:fork": "FORK_CITREA=true hardhat test"
   },
   "repository": {
     "type": "git",
