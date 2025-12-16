@@ -9,12 +9,13 @@ async function main() {
 
     const [deployer] = await ethers.getSigners();
     console.log("Deploying with account:", deployer.address);
-    const networkName = hre.network.name || "localhost";
+    const networkName = process.env.HARDHAT_NETWORK || "hardhat";
     console.log("Network:", networkName);
 
     // Get network-specific configuration
     const isTestnet = networkName === "citreaTestnet";
     const isMainnet = networkName === "citreaMainnet";
+    const isFork = process.env.FORK_CITREA === "true";
 
     let baseAssetAddress: string;
     let routerAddress: string;
@@ -27,14 +28,21 @@ async function main() {
     feeRecipient = process.env.FEE_RECIPIENT || deployer.address;
     console.log("Fee Recipient Address:", feeRecipient);
 
-    if (isTestnet) {
-        console.log("\n📝 Testnet Deployment");
+    if (isTestnet || isFork) {
+        console.log(isFork ? "\n🍴 Fork Deployment (using testnet config)" : "\n📝 Testnet Deployment");
 
-        // Check for existing base asset or deploy mock
+        // Testnet requires BASE_ASSET_ADDRESS; fork mode allows mocks for testing
         if (process.env.BASE_ASSET_ADDRESS) {
             baseAssetAddress = process.env.BASE_ASSET_ADDRESS;
             console.log("Using existing Base Asset:", baseAssetAddress);
+        } else if (isTestnet) {
+            throw new Error(
+                "BASE_ASSET_ADDRESS is required for testnet deployment.\n" +
+                "Set it in .env to the real JUSD/base asset address.\n" +
+                "For local testing with mocks, use: npm run deploy:fork"
+            );
         } else {
+            // Fork mode - deploy mock for testing
             console.log("Deploying mock WcBTC for testing...");
             const MockERC20 = await ethers.getContractFactory("MockERC20");
             const baseAsset = await MockERC20.deploy("Wrapped cBTC", "WcBTC");
@@ -95,8 +103,9 @@ async function main() {
         console.log("JuiceSwap V2 Router:", routerAddress);
         console.log("Init Code Hash:", initCodeHash);
     } else {
-        // Local hardhat network
-        console.log("\n🏠 Local Network Deployment");
+        // Local hardhat network (no fork)
+        console.log("\n🏠 Local Network Deployment (deploying mock contracts)");
+        console.log("⚠️  To use real contracts, set FORK_CITREA=true and configure .env");
         const MockERC20 = await ethers.getContractFactory("MockERC20");
         const baseAsset = await MockERC20.deploy("Wrapped cBTC", "WcBTC");
         await baseAsset.waitForDeployment();
@@ -127,10 +136,12 @@ async function main() {
     console.log("\n🔍 Checking Base Asset...");
     try {
         const baseAssetContract = await ethers.getContractAt(
-            ["function decimals() view returns (uint8)"],
+            ["function decimals() view returns (uint8)", "function name() view returns (string)"],
             baseAssetAddress
         );
         decimals = Number(await baseAssetContract.decimals());
+        const baseAssetName = await baseAssetContract.name();
+        console.log(`   Name: ${baseAssetName}`);
         console.log(`   Decimals: ${decimals}`);
     } catch (e) {
         console.log("   Could not fetch decimals, assuming 18");

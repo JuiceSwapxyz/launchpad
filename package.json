@@ -2,9 +2,17 @@
   "name": "@juiceswapxyz/launchpad",
   "version": "1.0.1",
   "description": "Production-ready token launchpad with bonding curve mechanism and automatic DEX graduation for Citrea",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
     "contracts/**/*.sol",
     "dist/",
