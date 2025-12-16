@@ -9,7 +9,7 @@ async function main() {
 
     const [deployer] = await ethers.getSigners();
     console.log("Deploying with account:", deployer.address);
-    const networkName = process.env.HARDHAT_NETWORK || "hardhat";
+    const networkName = hre.globalOptions.network ?? "hardhat";
     console.log("Network:", networkName);
 
     // Get network-specific configuration

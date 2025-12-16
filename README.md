@@ -150,8 +150,17 @@ npm run build            # Build npm package (exports ABIs)
 
 ### Publishing
 
+ABIs are automatically exported and the package is built before publishing via `prepublishOnly`.
+
 ```bash
+npm run compile          # Compile contracts first (if changed)
 npm publish --access public
+```
+
+To manually export ABIs without publishing:
+```bash
+npm run ts:export:abis   # Export ABIs only
+npm run build            # Export ABIs + bundle package
 ```
 
 ## Security
