@@ -142,10 +142,11 @@ describe("Launchpad Integration Tests", function () {
             const allTokensLengthBefore = await factory.allTokensLength();
             const tokenName = `Integration Test ${Date.now()}`;
             const tokenSymbol = `INT${allTokensLengthBefore}`;
+            const metadataURI = `ipfs://QmIntegrationTest${allTokensLengthBefore}`;
 
             log(`Creating token: ${tokenName} (${tokenSymbol})`);
 
-            const tx = await factory.connect(testSigner).createToken(tokenName, tokenSymbol);
+            const tx = await factory.connect(testSigner).createToken(tokenName, tokenSymbol, metadataURI);
             const receipt = await tx.wait();
 
             const allTokensLengthAfter = await factory.allTokensLength();
@@ -155,7 +156,15 @@ describe("Launchpad Integration Tests", function () {
             testTokenAddress = await factory.getToken(allTokensLengthAfter - 1n);
             testToken = await ethers.getContractAt("BondingCurveToken", testTokenAddress);
 
+            // Verify metadata was stored correctly
+            const info = await factory.getTokenInfo(testTokenAddress);
+            expect(info.name).to.equal(tokenName);
+            expect(info.symbol).to.equal(tokenSymbol);
+            expect(info.metadataURI).to.equal(metadataURI);
+            expect(info.creator).to.equal(testSigner.address);
+
             log(`Token created: ${testTokenAddress}`);
+            log(`Metadata URI: ${metadataURI}`);
         });
 
         it("Should initialize token with correct reserves", async function () {

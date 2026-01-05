@@ -40,7 +40,7 @@ describe("BondingCurveToken - Graduation", function () {
         ]);
 
         // Create a token
-        await tokenFactory.createToken("Test Token", "TEST");
+        await tokenFactory.createToken("Test Token", "TEST", "ipfs://QmTest123");
         const tokenAddress = await tokenFactory.getToken(0);
         const token = await ethers.getContractAt("BondingCurveToken", tokenAddress);
 
