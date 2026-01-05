@@ -14,6 +14,17 @@ import "./BondingCurveToken.sol";
 contract TokenFactory is Ownable, Pausable {
     using Clones for address;
 
+    /* ========== CONSTANTS ========== */
+
+    /// @notice Maximum allowed length for token name
+    uint256 public constant MAX_NAME_LENGTH = 100;
+
+    /// @notice Maximum allowed length for token symbol
+    uint256 public constant MAX_SYMBOL_LENGTH = 20;
+
+    /// @notice Maximum allowed length for metadata URI (1KB limit)
+    uint256 public constant MAX_METADATA_URI_LENGTH = 1024;
+
     /* ========== STATE VARIABLES ========== */
 
     /// @notice Implementation contract address for all bonding curve tokens
@@ -46,15 +57,17 @@ contract TokenFactory is Ownable, Pausable {
     /**
      * @notice Information about each deployed token
      * @param creator Address that created the token
-     * @param timestamp Block timestamp when token was created
+     * @param timestamp Block timestamp when token was created (uint96 for gas optimization)
      * @param name Token name
      * @param symbol Token symbol
+     * @param metadataURI URI pointing to token metadata JSON (IPFS/Arweave/HTTPS)
      */
     struct TokenInfo {
-        address creator;
-        uint256 timestamp;
-        string name;
-        string symbol;
+        address creator;      // 20 bytes
+        uint96 timestamp;     // 12 bytes (packed with creator in slot 0)
+        string name;          // dynamic
+        string symbol;        // dynamic
+        string metadataURI;   // dynamic
     }
 
     /* ========== EVENTS ========== */
@@ -68,6 +81,7 @@ contract TokenFactory is Ownable, Pausable {
      * @param baseAsset Address of the base asset (e.g., WcBTC)
      * @param initialVirtualBaseReserves Initial virtual base reserves for bonding curve
      * @param feeRecipient Address that will receive protocol fees at graduation
+     * @param metadataURI URI pointing to token metadata JSON
      */
     event TokenCreated(
         address indexed token,
@@ -76,7 +90,8 @@ contract TokenFactory is Ownable, Pausable {
         string symbol,
         address baseAsset,
         uint256 initialVirtualBaseReserves,
-        address feeRecipient
+        address feeRecipient,
+        string metadataURI
     );
 
     /**
@@ -109,6 +124,12 @@ contract TokenFactory is Ownable, Pausable {
     error InvalidInitCodeHash();
     error InvalidName();
     error InvalidSymbol();
+    error InvalidMetadataURI();
+    error NameTooLong();
+    error SymbolTooLong();
+    error MetadataURITooLong();
+    error InvalidControlCharacter();
+    error InvalidSymbolCharacter();
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -144,22 +165,81 @@ contract TokenFactory is Ownable, Pausable {
         initCodeHash = _initCodeHash;
     }
 
+    /* ========== INTERNAL FUNCTIONS ========== */
+
+    /**
+     * @notice Validates that a string contains no ASCII control characters
+     * @dev Rejects ALL C0 control characters (0x00-0x1F) and DEL (0x7F)
+     * @dev Prevents: null byte injection, newlines, terminal escapes, tab spoofing
+     * @dev Allows: Unicode characters (emoji, international text)
+     * @param str String to validate (name or metadataURI)
+     */
+    function _validatePrintableString(string memory str) private pure {
+        bytes memory b = bytes(str);
+        uint256 len = b.length;
+        for (uint256 i = 0; i < len; ) {
+            uint8 c = uint8(b[i]);
+            // Reject C0 control characters (0x00-0x1F) and DEL (0x7F)
+            if (c < 0x20 || c == 0x7F) {
+                revert InvalidControlCharacter();
+            }
+            unchecked { ++i; }
+        }
+    }
+
+    /**
+     * @notice Validates that a symbol contains only uppercase alphanumeric ASCII
+     * @dev Only allows A-Z (0x41-0x5A) and 0-9 (0x30-0x39)
+     * @dev Follows industry standard: BTC, ETH, USDT, etc.
+     * @param str Symbol string to validate
+     */
+    function _validateSymbol(string memory str) private pure {
+        bytes memory b = bytes(str);
+        uint256 len = b.length;
+        for (uint256 i = 0; i < len; ) {
+            uint8 c = uint8(b[i]);
+            // Allow only A-Z (0x41-0x5A) and 0-9 (0x30-0x39)
+            bool isUpperAlpha = (c >= 0x41 && c <= 0x5A);
+            bool isDigit = (c >= 0x30 && c <= 0x39);
+            if (!isUpperAlpha && !isDigit) {
+                revert InvalidSymbolCharacter();
+            }
+            unchecked { ++i; }
+        }
+    }
+
     /* ========== EXTERNAL FUNCTIONS ========== */
 
     /**
      * @notice Creates a new bonding curve token using minimal proxy pattern
      * @dev All tokens trade against the factory's base asset (set at deployment)
-     * @param name Name of the token
-     * @param symbol Symbol of the token
+     * @dev SECURITY: Enforces max lengths - name (100), symbol (20), metadataURI (1024 bytes)
+     * @dev SECURITY: Name/URI reject control chars (0x00-0x1F) and DEL (0x7F), allow Unicode
+     * @dev SECURITY: Symbol restricted to uppercase ASCII alphanumeric only (A-Z, 0-9)
+     * @param name Name of the token (max 100 chars, allows Unicode, no control chars)
+     * @param symbol Symbol of the token (max 20 chars, A-Z and 0-9 only)
+     * @param metadataURI URI pointing to token metadata JSON (max 1024 bytes, no control chars)
      * @return token Address of the newly created token
      */
     function createToken(
-        string memory name,
-        string memory symbol
+        string calldata name,
+        string calldata symbol,
+        string calldata metadataURI
     ) external whenNotPaused returns (address token) {
-        // Validate inputs
+        // Validate name
         if (bytes(name).length == 0) revert InvalidName();
+        if (bytes(name).length > MAX_NAME_LENGTH) revert NameTooLong();
+        _validatePrintableString(name);
+
+        // Validate symbol (strict: A-Z, 0-9 only)
         if (bytes(symbol).length == 0) revert InvalidSymbol();
+        if (bytes(symbol).length > MAX_SYMBOL_LENGTH) revert SymbolTooLong();
+        _validateSymbol(symbol);
+
+        // Validate metadata URI
+        if (bytes(metadataURI).length == 0) revert InvalidMetadataURI();
+        if (bytes(metadataURI).length > MAX_METADATA_URI_LENGTH) revert MetadataURITooLong();
+        _validatePrintableString(metadataURI);
 
         // Clone the implementation contract using EIP-1167 minimal proxy
         token = implementation.clone();
@@ -179,9 +259,10 @@ contract TokenFactory is Ownable, Pausable {
         // Store token information
         tokenInfo[token] = TokenInfo({
             creator: msg.sender,
-            timestamp: block.timestamp,
+            timestamp: uint96(block.timestamp),
             name: name,
-            symbol: symbol
+            symbol: symbol,
+            metadataURI: metadataURI
         });
 
         // Add to tokens array
@@ -195,7 +276,8 @@ contract TokenFactory is Ownable, Pausable {
             symbol,
             baseAsset,
             initialVirtualBaseReserves,
-            feeRecipient
+            feeRecipient,
+            metadataURI
         );
     }
 
@@ -266,21 +348,23 @@ contract TokenFactory is Ownable, Pausable {
      * @notice Returns information about a specific token
      * @param token Token address
      * @return creator Address of token creator
-     * @return timestamp Creation timestamp
+     * @return timestamp Creation timestamp (uint96 for gas optimization)
      * @return name Token name
      * @return symbol Token symbol
+     * @return metadataURI URI pointing to token metadata JSON
      */
     function getTokenInfo(address token)
         external
         view
         returns (
             address creator,
-            uint256 timestamp,
+            uint96 timestamp,
             string memory name,
-            string memory symbol
+            string memory symbol,
+            string memory metadataURI
         )
     {
         TokenInfo memory info = tokenInfo[token];
-        return (info.creator, info.timestamp, info.name, info.symbol);
+        return (info.creator, info.timestamp, info.name, info.symbol, info.metadataURI);
     }
 }
