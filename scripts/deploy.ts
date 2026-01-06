@@ -255,7 +255,7 @@ async function main() {
     if (isTestnet) {
         console.log("1. Verify contracts (see commands below)");
         console.log("2. Create a test token:");
-        console.log(`   factory.createToken("Test Token", "TEST")`);
+        console.log(`   factory.createToken("Test Token", "TEST", "ipfs://QmMetadataHash...")`);
         console.log(`   (All tokens will trade against: ${baseAssetAddress})`);
         console.log("3. Test buying/selling on the bonding curve");
         console.log("4. Test graduation to V2");

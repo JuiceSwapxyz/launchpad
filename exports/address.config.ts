@@ -23,8 +23,8 @@ export interface LaunchpadAddresses {
 export const ADDRESS: Record<number, LaunchpadAddresses> = {
   // Citrea Testnet
   5115: {
-    factory: "0x917E3EDb7868C1bDF6479BF7D4d3dd9AA56E9CFa",
-    implementation: "0xbC480D9e3d075166aDA8AD32Cc687472910aD5b9",
+    factory: "0xA72CbB319C62B7CA5988183c027533A1E7E33459",
+    implementation: "0xB06B25afeeB48f9dddF42b471Ce54dB7480b581A",
     baseAsset: "0xFdB0a83d94CD65151148a131167Eb499Cb85d015", // JUSD
     router: "0x48bA9db1EAcDB7C97B7B601c1E213F29E996d974", // JuiceSwap V2 Router
     feeRecipient: "0xE399782Fe2B0aBb138926b14261F49473b4881A3",
