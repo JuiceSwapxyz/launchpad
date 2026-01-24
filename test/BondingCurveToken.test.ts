@@ -38,7 +38,7 @@ describe("BondingCurveToken - Trading", function () {
         ]);
 
         // Create a token
-        await factory.createToken("Test Token", "TEST");
+        await factory.createToken("Test Token", "TEST", "ipfs://QmTest123");
         const tokenAddress = await factory.getToken(0);
         const token = await ethers.getContractAt("BondingCurveToken", tokenAddress);
 

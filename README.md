@@ -41,8 +41,202 @@ const factory = getContract({
   client: publicClient,
 });
 
-const hash = await factory.write.createToken(['My Token', 'MTK']);
+const hash = await factory.write.createToken([
+  'My Token',
+  'MTK',
+  'ipfs://QmW2WQi7j6c7UgJTarActp7tDNikE4B2qXtFCfLPdsgaTQ'
+]);
 ```
+
+## Token Metadata
+
+All tokens **MUST** include metadata when created. Metadata provides essential token information (logo, description, social links) and is **immutable** after creation.
+
+### Storage Options
+
+**IPFS (Recommended)**
+- Decentralized, content-addressed storage
+- Industry standard for token metadata
+- Format: `ipfs://Qm...`
+- Services: [Pinata](https://pinata.cloud), Web3.Storage, Infura
+
+**Arweave**
+- Permanent pay-once storage
+- Format: `ar://...`
+
+**HTTPS (Not Recommended)**
+- Centralized, mutable, can disappear
+- Only use for testing
+
+### Metadata JSON Structure
+
+The metadata follows the [OpenSea Metadata Standard](https://docs.opensea.io/docs/metadata-standards):
+
+```json
+{
+  "name": "My Awesome Token",
+  "description": "A revolutionary token launching on Citrea with fair bonding curve distribution",
+  "image": "ipfs://QmImageHash.../logo.png",
+  "external_url": "https://mytoken.com",
+  "attributes": [
+    { "trait_type": "Category", "value": "Meme" },
+    { "trait_type": "Network", "value": "Citrea" }
+  ],
+  "properties": {
+    "website": "https://mytoken.com",
+    "twitter": "https://twitter.com/mytoken",
+    "telegram": "https://t.me/mytoken",
+    "discord": "https://discord.gg/mytoken"
+  }
+}
+```
+
+**Required Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Token name (should match on-chain name) |
+| `description` | string | Token purpose and value proposition (100-500 chars recommended) |
+| `image` | URI | Logo/avatar (512x512px PNG/SVG, IPFS recommended) |
+
+**Optional Fields:**
+
+- `external_url` - Project website
+- `attributes` - Categorical traits for filtering (e.g., Category, Network, Launch Type)
+- `properties` - Social links and additional metadata (twitter, telegram, discord, whitepaper, etc.)
+
+### Security Constraints
+
+The contract enforces these validation rules:
+
+| Field | Maximum | Validation |
+|-------|---------|------------|
+| **Name** | 100 characters | No control characters (0x00-0x1F, 0x7F), allows Unicode |
+| **Symbol** | 20 characters | Uppercase A-Z and 0-9 only |
+| **Metadata URI** | 1,024 bytes | No control characters |
+
+**Forbidden Characters:**
+- Null bytes (`\x00`)
+- Control characters (`\x01-\x1F`) - newline, tab, escape codes, etc.
+- DEL character (`\x7F`)
+
+**Allowed:**
+- ASCII printable characters (0x20-0x7E) ✅
+- Unicode characters (emoji, international text) ✅
+- URL encoding (%, &, =) ✅
+
+### Contract Behavior
+
+**What the contract validates:**
+- ✅ Metadata URI is non-empty
+- ✅ URI length ≤ 1KB
+- ✅ No control characters in URI
+- ✅ Name/symbol length limits
+- ✅ Symbol contains only A-Z, 0-9
+
+**What the contract does NOT validate:**
+- ❌ URI format or reachability
+- ❌ JSON structure or content
+- ❌ Image existence or validity
+
+**Note:** Metadata is **immutable** after token creation (prevents rug pulls). Content validation is the responsibility of frontends and indexers.
+
+### How to Upload Metadata
+
+**Option 1: Pinata (Easiest)**
+
+1. Sign up at [pinata.cloud](https://pinata.cloud)
+2. Upload logo image → copy IPFS hash (e.g., `QmImageHash...`)
+3. Create `metadata.json` with image URI: `ipfs://QmImageHash...`
+4. Upload `metadata.json` → copy metadata hash (e.g., `QmMetadataHash...`)
+5. Use metadata hash when creating token: `ipfs://QmMetadataHash...`
+
+**Option 2: IPFS CLI**
+
+```bash
+# Upload image
+ipfs add logo.png
+# Returns: QmImageHash...
+
+# Create metadata.json
+cat > metadata.json <<EOF
+{
+  "name": "My Token",
+  "description": "Token description here",
+  "image": "ipfs://QmImageHash..."
+}
+EOF
+
+# Upload metadata
+ipfs add metadata.json
+# Returns: QmMetadataHash...
+```
+
+### Creating a Token
+
+```typescript
+import { TokenFactoryABI, ADDRESS } from '@juiceswapxyz/launchpad';
+
+// After uploading metadata to IPFS
+const metadataURI = "ipfs://QmMetadataHash...";
+
+const hash = await factory.write.createToken([
+  'My Awesome Token',
+  'MAT',
+  metadataURI
+]);
+```
+
+### Fetching Metadata in Frontend
+
+```typescript
+// Fetch metadata from IPFS using public gateway
+async function fetchMetadata(uri: string) {
+  if (uri.startsWith('ipfs://')) {
+    const hash = uri.replace('ipfs://', '');
+    const url = `https://ipfs.io/ipfs/${hash}`;
+    const response = await fetch(url);
+    return await response.json();
+  }
+
+  if (uri.startsWith('ar://')) {
+    const id = uri.replace('ar://', '');
+    const url = `https://arweave.net/${id}`;
+    const response = await fetch(url);
+    return await response.json();
+  }
+
+  // HTTPS - direct fetch
+  return await fetch(uri).then(r => r.json());
+}
+```
+
+**Tip:** Use multiple IPFS gateways for reliability (ipfs.io, cloudflare-ipfs.com, gateway.pinata.cloud).
+
+### Best Practices
+
+✅ **Use IPFS** for permanent, decentralized storage
+✅ **Include all required fields** (name, description, image)
+✅ **Add social links** in properties for community discovery
+✅ **Use high-quality images** (512x512px minimum, PNG/SVG)
+✅ **Pin IPFS content** to ensure availability (use Pinata, Infura, Web3.Storage)
+✅ **Test metadata** before deploying token
+❌ **Don't use HTTPS** for production (centralized, can disappear)
+❌ **Don't include sensitive info** in metadata (all public)
+
+### FAQ
+
+**Can I update metadata after token creation?**
+No. Metadata is immutable to prevent rug pulls and maintain trust.
+
+**What if my IPFS content becomes unavailable?**
+Pin your content on multiple IPFS nodes or use pinning services (Pinata, Infura, Web3.Storage).
+
+**Does the contract validate my JSON structure?**
+No. Only the URI format is validated. Content validation (JSON parsing, required fields) is the responsibility of frontends and indexers.
+
+**What image formats and sizes are supported?**
+PNG and SVG are recommended. Keep file size under 500KB. Minimum 512x512px for logos. Animated PNGs (APNG) and animated SVGs are supported.
 
 ## Contracts
 

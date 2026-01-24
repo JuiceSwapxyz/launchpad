@@ -9,6 +9,22 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 
 /**
+ * @notice Interface for TokenFactory to retrieve token metadata
+ */
+interface ITokenFactory {
+    function getTokenInfo(address token)
+        external
+        view
+        returns (
+            address creator,
+            uint96 timestamp,
+            string memory name,
+            string memory symbol,
+            string memory metadataURI
+        );
+}
+
+/**
  * @title BondingCurveToken
  * @notice ERC20 token with bonding curve trading and automatic Uniswap V2 graduation
  * @dev Implements virtual + real reserve system matching pump.fun mechanics
@@ -452,6 +468,16 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
      */
     function symbol() public view override returns (string memory) {
         return _tokenSymbol;
+    }
+
+    /**
+     * @notice Returns the metadata URI for this token
+     * @dev Queries factory contract for metadata, enables token self-awareness
+     * @return URI pointing to token metadata JSON (IPFS/Arweave/HTTPS)
+     */
+    function metadataURI() external view returns (string memory) {
+        (, , , , string memory uri) = ITokenFactory(factory).getTokenInfo(address(this));
+        return uri;
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */

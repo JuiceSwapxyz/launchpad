@@ -73,6 +73,11 @@ export const TokenFactoryABI = [
   },
   {
     inputs: [],
+    name: "InvalidControlCharacter",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "InvalidFeeRecipient",
     type: "error",
   },
@@ -84,6 +89,11 @@ export const TokenFactoryABI = [
   {
     inputs: [],
     name: "InvalidInitCodeHash",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidMetadataURI",
     type: "error",
   },
   {
@@ -103,7 +113,22 @@ export const TokenFactoryABI = [
   },
   {
     inputs: [],
+    name: "InvalidSymbolCharacter",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "InvalidVirtualBaseReserves",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "MetadataURITooLong",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "NameTooLong",
     type: "error",
   },
   {
@@ -126,6 +151,11 @@ export const TokenFactoryABI = [
       },
     ],
     name: "OwnableUnauthorizedAccount",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "SymbolTooLong",
     type: "error",
   },
   {
@@ -243,6 +273,12 @@ export const TokenFactoryABI = [
         name: "feeRecipient",
         type: "address",
       },
+      {
+        indexed: false,
+        internalType: "string",
+        name: "metadataURI",
+        type: "string",
+      },
     ],
     name: "TokenCreated",
     type: "event",
@@ -259,6 +295,45 @@ export const TokenFactoryABI = [
     ],
     name: "Unpaused",
     type: "event",
+  },
+  {
+    inputs: [],
+    name: "MAX_METADATA_URI_LENGTH",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "MAX_NAME_LENGTH",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "MAX_SYMBOL_LENGTH",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
   },
   {
     inputs: [
@@ -315,6 +390,11 @@ export const TokenFactoryABI = [
       {
         internalType: "string",
         name: "symbol",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "metadataURI",
         type: "string",
       },
     ],
@@ -377,9 +457,9 @@ export const TokenFactoryABI = [
         type: "address",
       },
       {
-        internalType: "uint256",
+        internalType: "uint96",
         name: "timestamp",
-        type: "uint256",
+        type: "uint96",
       },
       {
         internalType: "string",
@@ -389,6 +469,11 @@ export const TokenFactoryABI = [
       {
         internalType: "string",
         name: "symbol",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "metadataURI",
         type: "string",
       },
     ],
@@ -516,9 +601,9 @@ export const TokenFactoryABI = [
         type: "address",
       },
       {
-        internalType: "uint256",
+        internalType: "uint96",
         name: "timestamp",
-        type: "uint256",
+        type: "uint96",
       },
       {
         internalType: "string",
@@ -528,6 +613,11 @@ export const TokenFactoryABI = [
       {
         internalType: "string",
         name: "symbol",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "metadataURI",
         type: "string",
       },
     ],
