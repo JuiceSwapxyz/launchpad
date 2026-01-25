@@ -40,7 +40,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Deployment outputs
-deployments/
+deployments/hardhat-*
+deployments/localhost-*
 
 # Misc
 .temp/

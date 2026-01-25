@@ -1,0 +1,32 @@
+{
+  "network": "citreaTestnet",
+  "chainId": "5115",
+  "timestamp": "2026-01-25T06:44:43.320Z",
+  "deployer": "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
+  "contracts": {
+    "baseAsset": "0x6a850a548fdd050e8961223ec8FfCDfacEa57E39",
+    "implementation": "0xC46706007351AD7853159170fCC0489CCD04643D",
+    "factory": "0xCf5b581064F27a0cFABbbD3E538aFf3b358665c4",
+    "router": "0x37164703eF51EcB49C9a565C233a277003aE483f",
+    "feeRecipient": "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
+    "initCodeHash": "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e"
+  },
+  "constants": {
+    "totalSupply": "1000000000000000000000000000",
+    "virtualTokenReserves": "1073000000000000000000000000",
+    "initialVirtualBaseReserves": "4500000000000000000000",
+    "baseAssetDecimals": 18,
+    "realTokenReserves": "793100000000000000000000000",
+    "reservedForDex": "206900000000000000000000000",
+    "feeBps": "100",
+    "note": "Initial virtual base reserves is configurable via factory.setInitialVirtualBaseReserves()"
+  },
+  "economicsAtGraduation": {
+    "baseCollected": "~12750.75",
+    "marketCapUSD": "~$61650.00",
+    "totalLiquidityUSD": "~$25501.50",
+    "liquidityToMarketCapRatio": "~41.37%",
+    "priceMultiplier": "~14.7x",
+    "note": "These values are derived from initialVirtualBaseReserves using constant product formula (x*y=k)"
+  }
+}
