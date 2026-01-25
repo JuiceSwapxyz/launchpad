@@ -265,6 +265,7 @@ async function main() {
         console.log("2. Run security checks");
         console.log("3. Test with small amounts first");
         console.log("4. Monitor first few token launches closely");
+        console.log("5. Transfer ownership via deploy-governance.ts when ready");
     } else {
         console.log("1. Run tests: npm test");
         console.log("2. Check coverage: npm run test:coverage");

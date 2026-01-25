@@ -18,7 +18,7 @@ export interface LaunchpadAddresses {
 /**
  * Launchpad contract addresses by chain ID
  * - 5115: Citrea Testnet
- * - 62831: Citrea Mainnet
+ * - 4114: Citrea Mainnet
  */
 export const ADDRESS: Record<number, LaunchpadAddresses> = {
   // Citrea Testnet
@@ -31,7 +31,7 @@ export const ADDRESS: Record<number, LaunchpadAddresses> = {
     initCodeHash: "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e",
   },
   // Citrea Mainnet - TODO: Update after mainnet deployment
-  62831: {
+  4114: {
     factory: zeroAddress,
     implementation: zeroAddress,
     baseAsset: zeroAddress,
@@ -43,7 +43,7 @@ export const ADDRESS: Record<number, LaunchpadAddresses> = {
 
 /**
  * Get launchpad addresses for a specific chain
- * @param chainId - The chain ID (5115 for testnet, 62831 for mainnet)
+ * @param chainId - The chain ID (5115 for testnet, 4114 for mainnet)
  * @returns LaunchpadAddresses or undefined if chain not supported
  */
 export function getAddresses(chainId: number): LaunchpadAddresses | undefined {
