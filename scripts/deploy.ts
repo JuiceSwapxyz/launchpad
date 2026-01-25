@@ -4,6 +4,8 @@ import * as path from "path";
 import { ADDRESS as JUSD_ADDRESS } from "@juicedollar/jusd";
 import { V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES, V2_INIT_CODE_HASH } from "@juiceswapxyz/sdk-core";
 
+const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+
 const { ethers } = await hre.network.connect();
 
 async function main() {
@@ -17,7 +19,7 @@ async function main() {
     // Get network-specific configuration
     const isTestnet = networkName === "citreaTestnet";
     const isMainnet = networkName === "citreaMainnet";
-    const isFork = process.env.FORK_CITREA === "true";
+    const isFork = networkName === "forkTestnet" || networkName === "forkMainnet";
 
     // Map network name to chain ID
     const NETWORK_TO_CHAIN_ID: Record<string, number> = {
@@ -25,7 +27,9 @@ async function main() {
         citreaMainnet: 4114,  // ChainId.CITREA_MAINNET
     };
 
-    const chainId = NETWORK_TO_CHAIN_ID[networkName];
+    const chainId = isFork
+        ? Number((await ethers.provider.getNetwork()).chainId)
+        : NETWORK_TO_CHAIN_ID[networkName];
     if (!chainId && (isTestnet || isMainnet)) {
         throw new Error(`Unknown network: ${networkName}`);
     }
@@ -42,75 +46,46 @@ async function main() {
     console.log("Fee Recipient Address:", feeRecipient);
 
     if (isTestnet || isFork) {
-        console.log(isFork ? "\n🍴 Fork Deployment (using testnet config)" : "\n📝 Testnet Deployment");
+        const forkTarget = networkName === "forkMainnet" ? "mainnet" : "testnet";
+        console.log(isFork ? `\n🍴 Fork Deployment (using real ${forkTarget} contracts)` : "\n📝 Testnet Deployment");
 
-        if (isFork && !chainId) {
-            // Fork mode without real network - deploy mocks for testing
-            console.log("Deploying mocks for local fork testing...");
-
-            // Deploy mock base asset
-            const MockERC20 = await ethers.getContractFactory("MockERC20");
-            const baseAsset = await MockERC20.deploy("Wrapped cBTC", "WcBTC");
-            await baseAsset.waitForDeployment();
-            baseAssetAddress = await baseAsset.getAddress();
-            console.log("✅ Mock WcBTC deployed:", baseAssetAddress);
-
-            // Deploy mock factory first (for init code hash)
-            const MockFactory = await ethers.getContractFactory("MockUniswapV2Factory");
-            const mockFactory = await MockFactory.deploy();
-            await mockFactory.waitForDeployment();
-            const factoryAddr = await mockFactory.getAddress();
-            console.log("✅ Mock Factory deployed:", factoryAddr);
-
-            // Get init code hash from factory
-            initCodeHash = await mockFactory.INIT_CODE_PAIR_HASH();
-            console.log("✅ Init Code Hash:", initCodeHash);
-
-            // Deploy mock router with factory
-            const MockRouter = await ethers.getContractFactory("MockUniswapV2Router");
-            const mockRouter = await MockRouter.deploy(factoryAddr, baseAssetAddress);
-            await mockRouter.waitForDeployment();
-            routerAddress = await mockRouter.getAddress();
-            console.log("✅ Mock Router deployed:", routerAddress);
-        } else {
-            // Get addresses from packages (single source of truth)
-            const jusdAddresses = JUSD_ADDRESS[chainId];
-            if (!jusdAddresses) {
-                throw new Error(
-                    `❌ Chain ${chainId} not supported by @juicedollar/jusd.\n` +
-                    `   Supported chains: ${Object.keys(JUSD_ADDRESS).join(", ")}`
-                );
-            }
-
-            if (!jusdAddresses.juiceDollar || jusdAddresses.juiceDollar === "0x0000000000000000000000000000000000000000") {
-                throw new Error(
-                    `❌ JUSD not deployed on chain ${chainId}.\n` +
-                    `   Deploy JuiceDollar first and update @juicedollar/jusd package`
-                );
-            }
-
-            const v2FactoryAddress = V2_FACTORY_ADDRESSES[chainId];
-            const v2RouterAddress = V2_ROUTER_ADDRESSES[chainId];
-
-            if (!v2RouterAddress || v2RouterAddress === "0x0000000000000000000000000000000000000000") {
-                throw new Error(
-                    `❌ V2 Router not deployed on chain ${chainId}.\n` +
-                    `   Deploy DEX first using deploy-v3/scripts/deploy.ts`
-                );
-            }
-
-            baseAssetAddress = jusdAddresses.juiceDollar;
-            routerAddress = v2RouterAddress;
-
-            // Get init code hash from sdk-core (matches v2-periphery/UniswapV2Library.sol)
-            initCodeHash = V2_INIT_CODE_HASH;
-
-            console.log("📦 Addresses from packages (single source of truth):");
-            console.log(`   JUSD:           ${baseAssetAddress} (from @juicedollar/jusd)`);
-            console.log(`   V2 Router:      ${routerAddress} (from @juiceswapxyz/sdk-core)`);
-            console.log(`   V2 Factory:     ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
-            console.log(`   Init Code Hash: ${initCodeHash} (from @juiceswapxyz/sdk-core)`);
+        // Get addresses from packages (single source of truth)
+        const jusdAddresses = JUSD_ADDRESS[chainId];
+        if (!jusdAddresses) {
+            throw new Error(
+                `❌ Chain ${chainId} not supported by @juicedollar/jusd.\n` +
+                `   Supported chains: ${Object.keys(JUSD_ADDRESS).join(", ")}`
+            );
         }
+
+        if (!jusdAddresses.juiceDollar || jusdAddresses.juiceDollar === "0x0000000000000000000000000000000000000000") {
+            throw new Error(
+                `❌ JUSD not deployed on chain ${chainId}.\n` +
+                `   Deploy JuiceDollar first and update @juicedollar/jusd package`
+            );
+        }
+
+        const v2FactoryAddress = V2_FACTORY_ADDRESSES[chainId];
+        const v2RouterAddress = V2_ROUTER_ADDRESSES[chainId];
+
+        if (!v2RouterAddress || v2RouterAddress === "0x0000000000000000000000000000000000000000") {
+            throw new Error(
+                `❌ V2 Router not deployed on chain ${chainId}.\n` +
+                `   Deploy DEX first using deploy-v3/scripts/deploy.ts`
+            );
+        }
+
+        baseAssetAddress = jusdAddresses.juiceDollar;
+        routerAddress = v2RouterAddress;
+
+        // Get init code hash from sdk-core (matches v2-periphery/UniswapV2Library.sol)
+        initCodeHash = V2_INIT_CODE_HASH;
+
+        console.log("📦 Addresses from packages (single source of truth):");
+        console.log(`   JUSD:           ${baseAssetAddress} (from @juicedollar/jusd)`);
+        console.log(`   V2 Router:      ${routerAddress} (from @juiceswapxyz/sdk-core)`);
+        console.log(`   V2 Factory:     ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
+        console.log(`   Init Code Hash: ${initCodeHash} (from @juiceswapxyz/sdk-core)`);
     } else if (isMainnet) {
         console.log("\n🌐 Mainnet Deployment");
 
@@ -154,7 +129,7 @@ async function main() {
     } else {
         // Local hardhat network (no fork)
         console.log("\n🏠 Local Network Deployment (deploying mock contracts)");
-        console.log("⚠️  To use real contracts, set FORK_CITREA=true and configure .env");
+        console.log("⚠️  To use real contracts, use --network forkTestnet or --network forkMainnet");
         const MockERC20 = await ethers.getContractFactory("MockERC20");
         const baseAsset = await MockERC20.deploy("Wrapped cBTC", "WcBTC");
         await baseAsset.waitForDeployment();
@@ -247,16 +222,37 @@ async function main() {
     console.log("   Initial Virtual Base:", ethers.formatUnits(initialVirtualBaseReserves, decimals));
     console.log("   Init Code Hash:", initCodeHash);
 
-    // Create deployment summary
+    // Create deployment summary (matches smart-contracts pattern for verification)
     const deployment = {
-        network: networkName,
-        chainId: (await ethers.provider.getNetwork()).chainId.toString(),
-        timestamp: new Date().toISOString(),
-        deployer: deployer.address,
+        schemaVersion: "1.0",
+        network: {
+            name: networkName,
+            chainId: Number((await ethers.provider.getNetwork()).chainId),
+        },
+        deployment: {
+            deployedAt: new Date().toISOString(),
+            deployedBy: deployer.address,
+            blockNumber: await ethers.provider.getBlockNumber(),
+        },
         contracts: {
+            BondingCurveToken: {
+                address: implementationAddress,
+                constructorArgs: [], // No constructor args (implementation)
+            },
+            TokenFactory: {
+                address: factoryAddress,
+                constructorArgs: [
+                    implementationAddress,
+                    routerAddress,
+                    baseAssetAddress,
+                    feeRecipient,
+                    initialVirtualBaseReserves.toString(),
+                    initCodeHash,
+                ],
+            },
+        },
+        references: {
             baseAsset: baseAssetAddress,
-            implementation: implementationAddress,
-            factory: factoryAddress,
             router: routerAddress,
             feeRecipient: feeRecipient,
             initCodeHash: initCodeHash,
@@ -279,6 +275,10 @@ async function main() {
             priceMultiplier: "~14.7x",
             note: "These values are derived from initialVirtualBaseReserves using constant product formula (x*y=k)",
         },
+        metadata: {
+            deployer: "JuiceSwapXyz/launchpad",
+            scriptVersion: packageJson.version,
+        },
     };
 
     // Print deployment summary
@@ -288,14 +288,14 @@ async function main() {
     console.log(JSON.stringify(deployment, null, 2));
     console.log("=".repeat(70));
 
-    // Save deployment to file
+    // Save deployment to file (single file per network, matches deploy-v3 pattern)
     const deploymentsDir = path.join(process.cwd(), "deployments");
-    if (!fs.existsSync(deploymentsDir)) {
-        fs.mkdirSync(deploymentsDir);
+    const networkDir = path.join(deploymentsDir, networkName);
+    if (!fs.existsSync(networkDir)) {
+        fs.mkdirSync(networkDir, { recursive: true });
     }
 
-    const filename = `${networkName}-${Date.now()}.json`;
-    const filepath = path.join(deploymentsDir, filename);
+    const filepath = path.join(networkDir, "launchpad.json");
     fs.writeFileSync(filepath, JSON.stringify(deployment, null, 2));
     console.log(`\n💾 Deployment saved to: ${filepath}\n`);
 

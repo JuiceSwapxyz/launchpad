@@ -7,19 +7,35 @@ import { V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES } from "@juiceswapxyz/sdk-cor
 const networkConnection = await hre.network.connect();
 export const ethers = networkConnection.ethers;
 
-// Citrea Testnet chain ID
+// Chain IDs
 const CITREA_TESTNET_CHAIN_ID = 5115;
+const CITREA_MAINNET_CHAIN_ID = 4114;
+
+/**
+ * Get chain ID based on current network.
+ * - forkMainnet, citreaMainnet → 4114 (mainnet)
+ * - forkTestnet, citreaTestnet, hardhat → 5115 (testnet)
+ */
+function getChainId(): number {
+    const networkName = hre.globalOptions.network ?? "hardhat";
+    if (networkName === "forkMainnet" || networkName === "citreaMainnet") {
+        return CITREA_MAINNET_CHAIN_ID;
+    }
+    return CITREA_TESTNET_CHAIN_ID;
+}
 
 // Dead address for LP burn verification
 export const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
 
 // Get addresses from packages (single source of truth)
-const jusdAddresses = JUSD_ADDRESS[CITREA_TESTNET_CHAIN_ID];
+// Chain ID determined dynamically based on network
+const chainId = getChainId();
+const jusdAddresses = JUSD_ADDRESS[chainId];
 export const SUSD_ADDRESS = jusdAddresses.startUSD;
 export const STABLECOIN_BRIDGE = jusdAddresses.bridgeStartUSD;
 export const JUSD_TOKEN_ADDRESS = jusdAddresses.juiceDollar;
-export const V2_ROUTER_ADDRESS = V2_ROUTER_ADDRESSES[CITREA_TESTNET_CHAIN_ID];
-export const V2_FACTORY_ADDRESS = V2_FACTORY_ADDRESSES[CITREA_TESTNET_CHAIN_ID];
+export const V2_ROUTER_ADDRESS = V2_ROUTER_ADDRESSES[chainId];
+export const V2_FACTORY_ADDRESS = V2_FACTORY_ADDRESSES[chainId];
 
 // Minimal ABIs
 const ERC20_ABI = [
@@ -35,15 +51,16 @@ const BRIDGE_ABI = [
  * Check if running on a forked network
  */
 export function isForkMode(): boolean {
-    return process.env.FORK_CITREA === "true";
+    const networkName = hre.globalOptions.network ?? "hardhat";
+    return networkName === "forkTestnet" || networkName === "forkMainnet";
 }
 
 /**
  * Check if running on live testnet
  */
 export function isTestnet(): boolean {
-    return process.env.HARDHAT_NETWORK === "citreaTestnet" ||
-           (!isForkMode() && process.env.CITREA_TESTNET_RPC !== undefined);
+    const networkName = hre.globalOptions.network ?? "hardhat";
+    return networkName === "citreaTestnet";
 }
 
 /**

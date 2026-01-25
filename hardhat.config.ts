@@ -74,10 +74,39 @@ export default defineConfig({
         interval: 0,
       },
       allowBlocksWithSameTimestamp: true,
-      forking: process.env.FORK_CITREA === "true" ? {
+      // No forking - pure local network
+    },
+    forkTestnet: {
+      type: "edr-simulated",
+      chainType: "generic",
+      chainId: 5115,
+      hardfork: "cancun",
+      initialBaseFeePerGas: 0,
+      mining: {
+        auto: true,
+        interval: 0,
+      },
+      allowBlocksWithSameTimestamp: true,
+      forking: {
         url: process.env.CITREA_TESTNET_RPC || "https://rpc.testnet.citrea.xyz",
         enabled: true,
-      } : undefined,
+      },
+    },
+    forkMainnet: {
+      type: "edr-simulated",
+      chainType: "generic",
+      chainId: 4114,
+      hardfork: "cancun",
+      initialBaseFeePerGas: 0,
+      mining: {
+        auto: true,
+        interval: 0,
+      },
+      allowBlocksWithSameTimestamp: true,
+      forking: {
+        url: process.env.CITREA_MAINNET_RPC || "https://rpc.mainnet.citrea.xyz",
+        enabled: true,
+      },
     },
     citreaTestnet: {
       type: "http",
