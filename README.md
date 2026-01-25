@@ -342,12 +342,28 @@ npm run deploy:mainnet   # Deploy to Citrea Mainnet
 npm run build            # Build npm package (exports ABIs)
 ```
 
+### After Deployment
+
+After deploying contracts, update `exports/address.config.ts` with the new addresses from your deployment output:
+
+```typescript
+// Citrea Testnet
+5115: {
+  factory: "0x...",        // TokenFactory address
+  implementation: "0x...", // BondingCurveToken implementation
+  baseAsset: "0x...",      // JUSD address (from @juicedollar/jusd)
+  router: "0x...",         // JuiceSwap V2 Router (from @juiceswapxyz/sdk-core)
+  feeRecipient: "0x...",   // Fee recipient (usually deployer)
+  initCodeHash: "0x...",   // V2 factory init code hash (from @juiceswapxyz/sdk-core)
+},
+```
+
 ### Publishing
 
-ABIs are automatically exported and the package is built before publishing via `prepublishOnly`.
+After updating addresses, build and publish:
 
 ```bash
-npm run compile          # Compile contracts first (if changed)
+npm run build            # Export ABIs + bundle package
 npm publish --access public
 ```
 

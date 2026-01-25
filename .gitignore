@@ -6,7 +6,6 @@ types/
 
 # Dependencies
 node_modules/
-package-lock.json
 
 # Environment variables
 .env
@@ -41,7 +40,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Deployment outputs
-deployments/
+deployments/hardhat-*
+deployments/localhost-*
 
 # Misc
 .temp/

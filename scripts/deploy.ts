@@ -2,7 +2,7 @@ import hre from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
 import { ADDRESS as JUSD_ADDRESS } from "@juicedollar/jusd";
-import { V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES } from "@juiceswapxyz/sdk-core";
+import { V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES, V2_INIT_CODE_HASH } from "@juiceswapxyz/sdk-core";
 
 const { ethers } = await hre.network.connect();
 
@@ -102,19 +102,14 @@ async function main() {
             baseAssetAddress = jusdAddresses.juiceDollar;
             routerAddress = v2RouterAddress;
 
-            // Fetch init code hash from V2 factory contract
-            console.log("📦 Fetching INIT_CODE_HASH from V2 Factory...");
-            const v2Factory = await ethers.getContractAt(
-                ["function INIT_CODE_PAIR_HASH() view returns (bytes32)"],
-                v2FactoryAddress
-            );
-            initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+            // Get init code hash from sdk-core (matches v2-periphery/UniswapV2Library.sol)
+            initCodeHash = V2_INIT_CODE_HASH;
 
             console.log("📦 Addresses from packages (single source of truth):");
-            console.log(`   JUSD:          ${baseAssetAddress} (from @juicedollar/jusd)`);
-            console.log(`   V2 Router:     ${routerAddress} (from @juiceswapxyz/sdk-core)`);
-            console.log(`   V2 Factory:    ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
-            console.log(`   Init Code Hash: ${initCodeHash} (from V2 Factory contract)`);
+            console.log(`   JUSD:           ${baseAssetAddress} (from @juicedollar/jusd)`);
+            console.log(`   V2 Router:      ${routerAddress} (from @juiceswapxyz/sdk-core)`);
+            console.log(`   V2 Factory:     ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
+            console.log(`   Init Code Hash: ${initCodeHash} (from @juiceswapxyz/sdk-core)`);
         }
     } else if (isMainnet) {
         console.log("\n🌐 Mainnet Deployment");
@@ -148,19 +143,14 @@ async function main() {
         baseAssetAddress = jusdAddresses.juiceDollar;
         routerAddress = v2RouterAddress;
 
-        // Fetch init code hash from V2 factory contract
-        console.log("📦 Fetching INIT_CODE_HASH from V2 Factory...");
-        const v2Factory = await ethers.getContractAt(
-            ["function INIT_CODE_PAIR_HASH() view returns (bytes32)"],
-            v2FactoryAddress
-        );
-        initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+        // Get init code hash from sdk-core (matches v2-periphery/UniswapV2Library.sol)
+        initCodeHash = V2_INIT_CODE_HASH;
 
         console.log("📦 Addresses from packages (single source of truth):");
-        console.log(`   JUSD:          ${baseAssetAddress} (from @juicedollar/jusd)`);
-        console.log(`   V2 Router:     ${routerAddress} (from @juiceswapxyz/sdk-core)`);
-        console.log(`   V2 Factory:    ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
-        console.log(`   Init Code Hash: ${initCodeHash} (from V2 Factory contract)`);
+        console.log(`   JUSD:           ${baseAssetAddress} (from @juicedollar/jusd)`);
+        console.log(`   V2 Router:      ${routerAddress} (from @juiceswapxyz/sdk-core)`);
+        console.log(`   V2 Factory:     ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
+        console.log(`   Init Code Hash: ${initCodeHash} (from @juiceswapxyz/sdk-core)`);
     } else {
         // Local hardhat network (no fork)
         console.log("\n🏠 Local Network Deployment (deploying mock contracts)");
