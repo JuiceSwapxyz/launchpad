@@ -1,12 +1,32 @@
 {
-  "network": "citreaTestnet",
-  "chainId": "5115",
-  "timestamp": "2026-01-25T06:44:43.320Z",
-  "deployer": "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
+  "schemaVersion": "1.0",
+  "network": {
+    "name": "citreaTestnet",
+    "chainId": 5115
+  },
+  "deployment": {
+    "deployedAt": "2026-01-25T06:44:43.320Z",
+    "deployedBy": "0xaa90815Cb5250A868FDc914ADCbf26773126F550"
+  },
   "contracts": {
+    "BondingCurveToken": {
+      "address": "0xC46706007351AD7853159170fCC0489CCD04643D",
+      "constructorArgs": []
+    },
+    "TokenFactory": {
+      "address": "0xCf5b581064F27a0cFABbbD3E538aFf3b358665c4",
+      "constructorArgs": [
+        "0xC46706007351AD7853159170fCC0489CCD04643D",
+        "0x37164703eF51EcB49C9a565C233a277003aE483f",
+        "0x6a850a548fdd050e8961223ec8FfCDfacEa57E39",
+        "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
+        "4500000000000000000000",
+        "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e"
+      ]
+    }
+  },
+  "references": {
     "baseAsset": "0x6a850a548fdd050e8961223ec8FfCDfacEa57E39",
-    "implementation": "0xC46706007351AD7853159170fCC0489CCD04643D",
-    "factory": "0xCf5b581064F27a0cFABbbD3E538aFf3b358665c4",
     "router": "0x37164703eF51EcB49C9a565C233a277003aE483f",
     "feeRecipient": "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
     "initCodeHash": "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e"
@@ -28,5 +48,9 @@
     "liquidityToMarketCapRatio": "~41.37%",
     "priceMultiplier": "~14.7x",
     "note": "These values are derived from initialVirtualBaseReserves using constant product formula (x*y=k)"
+  },
+  "metadata": {
+    "deployer": "JuiceSwapXyz/launchpad",
+    "scriptVersion": "2.1.2"
   }
 }

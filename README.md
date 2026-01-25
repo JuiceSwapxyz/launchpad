@@ -322,12 +322,13 @@ Copy `.env.example` to `.env` and set:
 PRIVATE_KEY=
 CITREA_TESTNET_RPC=https://rpc.testnet.citrea.xyz
 CITREA_MAINNET_RPC=https://rpc.citrea.xyz
-UNISWAP_V2_ROUTER=           # JuiceSwap router
-BASE_ASSET_ADDRESS=          # JUSD address
-INIT_CODE_HASH=              # V2 factory init code hash
-FEE_RECIPIENT=               # Optional, defaults to deployer
-INITIAL_VIRTUAL_BASE=4500    # Optional, in JUSD units
+
+# Optional
+FEE_RECIPIENT=               # Defaults to deployer
+INITIAL_VIRTUAL_BASE=4500    # Virtual base reserves in JUSD
 ```
+
+> **Note:** Most addresses (JUSD, V2 Router, INIT_CODE_HASH) are now auto-imported from `@juicedollar/jusd` and `@juiceswapxyz/sdk-core` packages.
 
 ### Commands
 
@@ -336,10 +337,24 @@ npm install
 npm run compile          # Compile contracts
 npm test                 # Run unit tests
 npm run test:coverage    # Run with coverage
-npm run test:integration:fork  # Run integration tests on fork
+npm run test:fork        # Run tests on local testnet fork
+npm run test:integration:fork  # Run integration tests on local testnet fork
+npm run deploy:fork      # Deploy to local testnet fork
 npm run deploy:testnet   # Deploy to Citrea Testnet
 npm run deploy:mainnet   # Deploy to Citrea Mainnet
 npm run build            # Build npm package (exports ABIs)
+```
+
+**Fork Networks:**
+
+For local development with real contract state, use fork networks:
+
+```bash
+# Fork Citrea Testnet locally (uses real JUSD, V2 Router, etc.)
+npx hardhat run scripts/deploy.ts --network forkTestnet
+
+# Fork Citrea Mainnet locally
+npx hardhat run scripts/deploy.ts --network forkMainnet
 ```
 
 ### After Deployment
