@@ -21,13 +21,13 @@ export interface LaunchpadAddresses {
  * - 4114: Citrea Mainnet
  */
 export const ADDRESS: Record<number, LaunchpadAddresses> = {
-  // Citrea Testnet
+  // Citrea Testnet (deployed 2026-01-25)
   5115: {
-    factory: "0xA72CbB319C62B7CA5988183c027533A1E7E33459",
-    implementation: "0xB06B25afeeB48f9dddF42b471Ce54dB7480b581A",
-    baseAsset: "0xFdB0a83d94CD65151148a131167Eb499Cb85d015", // JUSD
-    router: "0x48bA9db1EAcDB7C97B7B601c1E213F29E996d974", // JuiceSwap V2 Router
-    feeRecipient: "0xE399782Fe2B0aBb138926b14261F49473b4881A3",
+    factory: "0xCf5b581064F27a0cFABbbD3E538aFf3b358665c4",
+    implementation: "0xC46706007351AD7853159170fCC0489CCD04643D",
+    baseAsset: "0x6a850a548fdd050e8961223ec8FfCDfacEa57E39", // JUSD
+    router: "0x37164703eF51EcB49C9a565C233a277003aE483f", // JuiceSwap V2 Router
+    feeRecipient: "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
     initCodeHash: "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e",
   },
   // Citrea Mainnet - TODO: Update after mainnet deployment
