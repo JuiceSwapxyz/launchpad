@@ -1,16 +1,25 @@
 import hre from "hardhat";
+import { ADDRESS as JUSD_ADDRESS } from "@juicedollar/jusd";
+import { V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES } from "@juiceswapxyz/sdk-core";
 
 // Top-level await - Hardhat 3.0 pattern
 // Export ethers so test file uses same connection
 const networkConnection = await hre.network.connect();
 export const ethers = networkConnection.ethers;
 
+// Citrea Testnet chain ID
+const CITREA_TESTNET_CHAIN_ID = 5115;
+
 // Dead address for LP burn verification
 export const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD";
 
-// StablecoinBridge addresses (Citrea Testnet) - LATEST from JuiceDollar
-export const SUSD_ADDRESS = "0xa37f823Bd1bae4379265A4fF9cD5a68f402dE2f5";
-export const STABLECOIN_BRIDGE = "0x8c5e5594c05205454BC09487ad53db4e4DB6564D";
+// Get addresses from packages (single source of truth)
+const jusdAddresses = JUSD_ADDRESS[CITREA_TESTNET_CHAIN_ID];
+export const SUSD_ADDRESS = jusdAddresses.startUSD;
+export const STABLECOIN_BRIDGE = jusdAddresses.bridgeStartUSD;
+export const JUSD_TOKEN_ADDRESS = jusdAddresses.juiceDollar;
+export const V2_ROUTER_ADDRESS = V2_ROUTER_ADDRESSES[CITREA_TESTNET_CHAIN_ID];
+export const V2_FACTORY_ADDRESS = V2_FACTORY_ADDRESSES[CITREA_TESTNET_CHAIN_ID];
 
 // Minimal ABIs
 const ERC20_ABI = [
@@ -139,16 +148,24 @@ export function log(message: string): void {
 
 /**
  * Deploy TokenFactory and implementation for fork testing.
- * Uses real JUSD and V2 Router addresses from the forked state.
+ * Uses addresses from packages (single source of truth).
  */
 export async function deployFactory() {
     const [deployer] = await ethers.getSigners();
 
-    // Use real addresses from forked state
-    const baseAssetAddress = getEnvOrThrow("BASE_ASSET_ADDRESS");
-    const routerAddress = getEnvOrThrow("UNISWAP_V2_ROUTER");
-    const initCodeHash = getEnvOrThrow("INIT_CODE_HASH");
+    // Use addresses from packages
+    const baseAssetAddress = JUSD_TOKEN_ADDRESS;
+    const routerAddress = V2_ROUTER_ADDRESS;
     const initialVirtualBase = ethers.parseEther(process.env.INITIAL_VIRTUAL_BASE || "4500");
+
+    // Fetch init code hash from V2 factory contract
+    log("Fetching INIT_CODE_HASH from V2 Factory...");
+    const v2Factory = await ethers.getContractAt(
+        ["function INIT_CODE_PAIR_HASH() view returns (bytes32)"],
+        V2_FACTORY_ADDRESS
+    );
+    const initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+    log(`Init Code Hash: ${initCodeHash}`);
 
     log("Deploying BondingCurveToken implementation...");
     const BondingCurveToken = await ethers.getContractFactory("BondingCurveToken");

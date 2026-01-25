@@ -1,6 +1,8 @@
 import hre from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
+import { ADDRESS as JUSD_ADDRESS } from "@juicedollar/jusd";
+import { V2_FACTORY_ADDRESSES, V2_ROUTER_ADDRESSES } from "@juiceswapxyz/sdk-core";
 
 const { ethers } = await hre.network.connect();
 
@@ -17,6 +19,17 @@ async function main() {
     const isMainnet = networkName === "citreaMainnet";
     const isFork = process.env.FORK_CITREA === "true";
 
+    // Map network name to chain ID
+    const NETWORK_TO_CHAIN_ID: Record<string, number> = {
+        citreaTestnet: 5115,  // ChainId.CITREA_TESTNET
+        citreaMainnet: 4114,  // ChainId.CITREA_MAINNET
+    };
+
+    const chainId = NETWORK_TO_CHAIN_ID[networkName];
+    if (!chainId && (isTestnet || isMainnet)) {
+        throw new Error(`Unknown network: ${networkName}`);
+    }
+
     let baseAssetAddress: string;
     let routerAddress: string;
     let feeRecipient: string;
@@ -31,32 +44,16 @@ async function main() {
     if (isTestnet || isFork) {
         console.log(isFork ? "\n🍴 Fork Deployment (using testnet config)" : "\n📝 Testnet Deployment");
 
-        // Testnet requires BASE_ASSET_ADDRESS; fork mode allows mocks for testing
-        if (process.env.BASE_ASSET_ADDRESS) {
-            baseAssetAddress = process.env.BASE_ASSET_ADDRESS;
-            console.log("Using existing Base Asset:", baseAssetAddress);
-        } else if (isTestnet) {
-            throw new Error(
-                "BASE_ASSET_ADDRESS is required for testnet deployment.\n" +
-                "Set it in .env to the real JUSD/base asset address.\n" +
-                "For local testing with mocks, use: npm run deploy:fork"
-            );
-        } else {
-            // Fork mode - deploy mock for testing
-            console.log("Deploying mock WcBTC for testing...");
+        if (isFork && !chainId) {
+            // Fork mode without real network - deploy mocks for testing
+            console.log("Deploying mocks for local fork testing...");
+
+            // Deploy mock base asset
             const MockERC20 = await ethers.getContractFactory("MockERC20");
             const baseAsset = await MockERC20.deploy("Wrapped cBTC", "WcBTC");
             await baseAsset.waitForDeployment();
             baseAssetAddress = await baseAsset.getAddress();
             console.log("✅ Mock WcBTC deployed:", baseAssetAddress);
-        }
-
-        // Use environment variable or deploy mock router/factory
-        routerAddress = process.env.UNISWAP_V2_ROUTER || "";
-        initCodeHash = process.env.INIT_CODE_HASH || "";
-
-        if (!routerAddress) {
-            console.log("⚠️  No UNISWAP_V2_ROUTER set, deploying mock V2 contracts...");
 
             // Deploy mock factory first (for init code hash)
             const MockFactory = await ethers.getContractFactory("MockUniswapV2Factory");
@@ -75,33 +72,95 @@ async function main() {
             await mockRouter.waitForDeployment();
             routerAddress = await mockRouter.getAddress();
             console.log("✅ Mock Router deployed:", routerAddress);
-        } else if (!initCodeHash) {
-            throw new Error(
-                "❌ INIT_CODE_HASH is required when using existing UNISWAP_V2_ROUTER\n" +
-                "   Get it from your V2 factory: factory.INIT_CODE_PAIR_HASH()"
+        } else {
+            // Get addresses from packages (single source of truth)
+            const jusdAddresses = JUSD_ADDRESS[chainId];
+            if (!jusdAddresses) {
+                throw new Error(
+                    `❌ Chain ${chainId} not supported by @juicedollar/jusd.\n` +
+                    `   Supported chains: ${Object.keys(JUSD_ADDRESS).join(", ")}`
+                );
+            }
+
+            if (!jusdAddresses.juiceDollar || jusdAddresses.juiceDollar === "0x0000000000000000000000000000000000000000") {
+                throw new Error(
+                    `❌ JUSD not deployed on chain ${chainId}.\n` +
+                    `   Deploy JuiceDollar first and update @juicedollar/jusd package`
+                );
+            }
+
+            const v2FactoryAddress = V2_FACTORY_ADDRESSES[chainId];
+            const v2RouterAddress = V2_ROUTER_ADDRESSES[chainId];
+
+            if (!v2RouterAddress || v2RouterAddress === "0x0000000000000000000000000000000000000000") {
+                throw new Error(
+                    `❌ V2 Router not deployed on chain ${chainId}.\n` +
+                    `   Deploy DEX first using deploy-v3/scripts/deploy.ts`
+                );
+            }
+
+            baseAssetAddress = jusdAddresses.juiceDollar;
+            routerAddress = v2RouterAddress;
+
+            // Fetch init code hash from V2 factory contract
+            console.log("📦 Fetching INIT_CODE_HASH from V2 Factory...");
+            const v2Factory = await ethers.getContractAt(
+                ["function INIT_CODE_PAIR_HASH() view returns (bytes32)"],
+                v2FactoryAddress
             );
+            initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+
+            console.log("📦 Addresses from packages (single source of truth):");
+            console.log(`   JUSD:          ${baseAssetAddress} (from @juicedollar/jusd)`);
+            console.log(`   V2 Router:     ${routerAddress} (from @juiceswapxyz/sdk-core)`);
+            console.log(`   V2 Factory:    ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
+            console.log(`   Init Code Hash: ${initCodeHash} (from V2 Factory contract)`);
         }
     } else if (isMainnet) {
         console.log("\n🌐 Mainnet Deployment");
 
-        // Use real addresses from environment
-        baseAssetAddress = process.env.BASE_ASSET_ADDRESS || "";
-        routerAddress = process.env.UNISWAP_V2_ROUTER || "";
-        initCodeHash = process.env.INIT_CODE_HASH || "";
-
-        if (!baseAssetAddress || !routerAddress || !initCodeHash) {
+        // Get addresses from packages (single source of truth)
+        const jusdAddresses = JUSD_ADDRESS[chainId];
+        if (!jusdAddresses) {
             throw new Error(
-                "❌ Missing required environment variables:\n" +
-                `   BASE_ASSET_ADDRESS: ${baseAssetAddress ? '✓' : '✗'}\n` +
-                `   UNISWAP_V2_ROUTER: ${routerAddress ? '✓' : '✗'}\n` +
-                `   INIT_CODE_HASH: ${initCodeHash ? '✓' : '✗'}\n` +
-                "\n   INIT_CODE_HASH: Get from your V2 factory via factory.INIT_CODE_PAIR_HASH()"
+                `❌ Chain ${chainId} not supported by @juicedollar/jusd.\n` +
+                `   Supported chains: ${Object.keys(JUSD_ADDRESS).join(", ")}`
             );
         }
 
-        console.log("Base Asset (JUSD) Address:", baseAssetAddress);
-        console.log("JuiceSwap V2 Router:", routerAddress);
-        console.log("Init Code Hash:", initCodeHash);
+        if (!jusdAddresses.juiceDollar || jusdAddresses.juiceDollar === "0x0000000000000000000000000000000000000000") {
+            throw new Error(
+                `❌ JUSD not deployed on chain ${chainId}.\n` +
+                `   Deploy JuiceDollar first and update @juicedollar/jusd package`
+            );
+        }
+
+        const v2FactoryAddress = V2_FACTORY_ADDRESSES[chainId];
+        const v2RouterAddress = V2_ROUTER_ADDRESSES[chainId];
+
+        if (!v2RouterAddress || v2RouterAddress === "0x0000000000000000000000000000000000000000") {
+            throw new Error(
+                `❌ V2 Router not deployed on chain ${chainId}.\n` +
+                `   Deploy DEX first using deploy-v3/scripts/deploy.ts`
+            );
+        }
+
+        baseAssetAddress = jusdAddresses.juiceDollar;
+        routerAddress = v2RouterAddress;
+
+        // Fetch init code hash from V2 factory contract
+        console.log("📦 Fetching INIT_CODE_HASH from V2 Factory...");
+        const v2Factory = await ethers.getContractAt(
+            ["function INIT_CODE_PAIR_HASH() view returns (bytes32)"],
+            v2FactoryAddress
+        );
+        initCodeHash = await v2Factory.INIT_CODE_PAIR_HASH();
+
+        console.log("📦 Addresses from packages (single source of truth):");
+        console.log(`   JUSD:          ${baseAssetAddress} (from @juicedollar/jusd)`);
+        console.log(`   V2 Router:     ${routerAddress} (from @juiceswapxyz/sdk-core)`);
+        console.log(`   V2 Factory:    ${v2FactoryAddress} (from @juiceswapxyz/sdk-core)`);
+        console.log(`   Init Code Hash: ${initCodeHash} (from V2 Factory contract)`);
     } else {
         // Local hardhat network (no fork)
         console.log("\n🏠 Local Network Deployment (deploying mock contracts)");

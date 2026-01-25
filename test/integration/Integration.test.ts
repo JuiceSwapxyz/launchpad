@@ -9,6 +9,9 @@ import {
     formatTokens,
     log,
     ethers, // Use same connection as helpers
+    JUSD_TOKEN_ADDRESS,
+    V2_ROUTER_ADDRESS,
+    V2_FACTORY_ADDRESS,
 } from "./helpers.js";
 
 // Contract interfaces
@@ -63,9 +66,9 @@ describe("Launchpad Integration Tests", function () {
             return;
         }
 
-        // Load required addresses
-        baseAssetAddress = getEnvOrThrow("BASE_ASSET_ADDRESS");
-        routerAddress = getEnvOrThrow("UNISWAP_V2_ROUTER");
+        // Use addresses from packages (single source of truth)
+        baseAssetAddress = JUSD_TOKEN_ADDRESS;
+        routerAddress = V2_ROUTER_ADDRESS;
 
         if (isForkMode()) {
             // Deploy contracts fresh in this fork instance
@@ -120,7 +123,9 @@ describe("Launchpad Integration Tests", function () {
 
         it("Should have correct init code hash", async function () {
             const initCodeHash = await factory.initCodeHash();
-            const expectedHash = getEnvOrThrow("INIT_CODE_HASH");
+            // Fetch expected hash from V2 factory contract (single source of truth)
+            const v2Factory = new ethers.Contract(V2_FACTORY_ADDRESS, V2_FACTORY_ABI, ethers.provider);
+            const expectedHash = await v2Factory.INIT_CODE_PAIR_HASH();
             expect(initCodeHash.toLowerCase()).to.equal(expectedHash.toLowerCase());
         });
 
