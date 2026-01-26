@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "network": {
+    "name": "citreaMainnet",
+    "chainId": 4114
+  },
+  "deployment": {
+    "deployedAt": "2026-01-26T05:42:21.463Z",
+    "deployedBy": "0xECc0b131D481dE8aB538D19F04dD4b253660D82B",
+    "blockNumber": 2652915
+  },
+  "contracts": {
+    "BondingCurveToken": {
+      "address": "0xB8418EDc48c0a63a0Ab29F50BdE09552A8aECa0c",
+      "constructorArgs": []
+    },
+    "TokenFactory": {
+      "address": "0xF5E06d37091a252A3Ae6BFd575D97635625028b9",
+      "constructorArgs": [
+        "0xB8418EDc48c0a63a0Ab29F50BdE09552A8aECa0c",
+        "0x6BDea31C89E0A202cE84b5752BB2e827B39984ae",
+        "0x0987D3720D38847ac6dBB9D025B9dE892a3CA35C",
+        "0xECc0b131D481dE8aB538D19F04dD4b253660D82B",
+        "4500000000000000000000",
+        "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e"
+      ]
+    }
+  },
+  "references": {
+    "baseAsset": "0x0987D3720D38847ac6dBB9D025B9dE892a3CA35C",
+    "router": "0x6BDea31C89E0A202cE84b5752BB2e827B39984ae",
+    "feeRecipient": "0xECc0b131D481dE8aB538D19F04dD4b253660D82B",
+    "initCodeHash": "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e"
+  },
+  "constants": {
+    "totalSupply": "1000000000000000000000000000",
+    "virtualTokenReserves": "1073000000000000000000000000",
+    "initialVirtualBaseReserves": "4500000000000000000000",
+    "baseAssetDecimals": 18,
+    "realTokenReserves": "793100000000000000000000000",
+    "reservedForDex": "206900000000000000000000000",
+    "feeBps": "100",
+    "note": "Initial virtual base reserves is configurable via factory.setInitialVirtualBaseReserves()"
+  },
+  "economicsAtGraduation": {
+    "baseCollected": "~12750.75",
+    "marketCapUSD": "~$61650.00",
+    "totalLiquidityUSD": "~$25501.50",
+    "liquidityToMarketCapRatio": "~41.37%",
+    "priceMultiplier": "~14.7x",
+    "note": "These values are derived from initialVirtualBaseReserves using constant product formula (x*y=k)"
+  },
+  "metadata": {
+    "deployer": "JuiceSwapXyz/launchpad",
+    "scriptVersion": "2.1.2"
+  }
+}

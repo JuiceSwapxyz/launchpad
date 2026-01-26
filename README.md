@@ -321,7 +321,7 @@ Copy `.env.example` to `.env` and set:
 ```
 PRIVATE_KEY=
 CITREA_TESTNET_RPC=https://rpc.testnet.citrea.xyz
-CITREA_MAINNET_RPC=https://rpc.citrea.xyz
+CITREA_MAINNET_RPC=https://rpc.mainnet.citrea.xyz
 
 # Optional
 FEE_RECIPIENT=               # Defaults to deployer

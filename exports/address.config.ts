@@ -30,14 +30,14 @@ export const ADDRESS: Record<number, LaunchpadAddresses> = {
     feeRecipient: "0xaa90815Cb5250A868FDc914ADCbf26773126F550",
     initCodeHash: "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e",
   },
-  // Citrea Mainnet - TODO: Update after mainnet deployment
+  // Citrea Mainnet (deployed 2026-01-26)
   4114: {
-    factory: zeroAddress,
-    implementation: zeroAddress,
-    baseAsset: zeroAddress,
-    router: zeroAddress,
-    feeRecipient: zeroAddress,
-    initCodeHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    factory: "0xF5E06d37091a252A3Ae6BFd575D97635625028b9",
+    implementation: "0xB8418EDc48c0a63a0Ab29F50BdE09552A8aECa0c",
+    baseAsset: "0x0987D3720D38847ac6dBB9D025B9dE892a3CA35C", // JUSD
+    router: "0x6BDea31C89E0A202cE84b5752BB2e827B39984ae", // JuiceSwap V2 Router
+    feeRecipient: "0xECc0b131D481dE8aB538D19F04dD4b253660D82B",
+    initCodeHash: "0xdc3b9f52403077ec7261ad325e15f34e395cf7e2a5c3782098edb10a7599cc3e",
   },
 };
 
