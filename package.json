@@ -1,6 +1,6 @@
 {
   "name": "@juiceswapxyz/launchpad",
-  "version": "2.1.3",
+  "version": "3.0.0",
   "description": "Production-ready token launchpad with bonding curve mechanism, secure metadata support, and automatic DEX graduation for Citrea",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -87,8 +87,8 @@
     "viem": "^2.41.2"
   },
   "dependencies": {
-    "@juicedollar/jusd": "^1.1.1",
-    "@juiceswapxyz/sdk-core": "^0.1.12-beta.0",
+    "@juicedollar/jusd": "^3.0.0",
+    "@juiceswapxyz/sdk-core": "^3.0.2",
     "@openzeppelin/contracts": "^5.4.0",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0"

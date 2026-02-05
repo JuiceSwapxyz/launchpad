@@ -88,7 +88,7 @@ export default defineConfig({
       },
       allowBlocksWithSameTimestamp: true,
       forking: {
-        url: process.env.CITREA_TESTNET_RPC || "https://rpc.testnet.citrea.xyz",
+        url: process.env.CITREA_TESTNET_RPC || "https://rpc.testnet.citreascan.com",
         enabled: true,
       },
     },
@@ -104,20 +104,20 @@ export default defineConfig({
       },
       allowBlocksWithSameTimestamp: true,
       forking: {
-        url: process.env.CITREA_MAINNET_RPC || "https://rpc.mainnet.citrea.xyz",
+        url: process.env.CITREA_MAINNET_RPC || "https://rpc.citreascan.com",
         enabled: true,
       },
     },
     citreaTestnet: {
       type: "http",
       chainType: "generic",
-      url: process.env.CITREA_TESTNET_RPC || "https://rpc.testnet.citrea.xyz",
+      url: process.env.CITREA_TESTNET_RPC || "https://rpc.testnet.citreascan.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
     citreaMainnet: {
       type: "http",
       chainType: "generic",
-      url: process.env.CITREA_MAINNET_RPC || "https://rpc.mainnet.citrea.xyz",
+      url: process.env.CITREA_MAINNET_RPC || "https://rpc.citreascan.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },
