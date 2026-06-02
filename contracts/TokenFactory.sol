@@ -3,15 +3,18 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./BondingCurveToken.sol";
+import "./interfaces/IPermit2.sol";
 
 /**
  * @title TokenFactory
  * @notice Factory contract for deploying bonding curve tokens using minimal proxies (EIP-1167)
  * @dev Uses OpenZeppelin Clones library for gas-efficient token deployment
  */
-contract TokenFactory is Ownable, Pausable {
+contract TokenFactory is Ownable, Pausable, ReentrancyGuard {
     using Clones for address;
 
     /* ========== CONSTANTS ========== */
@@ -36,6 +39,9 @@ contract TokenFactory is Ownable, Pausable {
     /// @notice Base asset that all tokens will trade against (e.g., JUSD)
     /// @dev NOTE: If a fee-on-transfer token is used, graduation will revert due to reserve mismatch.
     address public immutable baseAsset;
+
+    /// @notice Permit2 contract used for signature-based dev-buy funding
+    IPermit2 public immutable permit2;
 
     /// @notice Init code hash for Uniswap V2 pair address computation (chain-specific)
     bytes32 public immutable initCodeHash;
@@ -114,11 +120,26 @@ contract TokenFactory is Ownable, Pausable {
         uint256 newValue
     );
 
+    /**
+     * @notice Emitted when a creator's atomically bundled dev buy is executed
+     * @param token Address of the newly created token
+     * @param creator Address of the token creator and dev-buy recipient
+     * @param baseIn Amount of base asset spent
+     * @param tokensOut Amount of launchpad tokens received
+     */
+    event DevBuyExecuted(
+        address indexed token,
+        address indexed creator,
+        uint256 baseIn,
+        uint256 tokensOut
+    );
+
     /* ========== ERRORS ========== */
 
     error InvalidImplementation();
     error InvalidRouter();
     error InvalidBaseAsset();
+    error InvalidPermit2();
     error InvalidFeeRecipient();
     error InvalidVirtualBaseReserves();
     error InvalidInitCodeHash();
@@ -130,6 +151,13 @@ contract TokenFactory is Ownable, Pausable {
     error MetadataURITooLong();
     error InvalidControlCharacter();
     error InvalidSymbolCharacter();
+    error InvalidDevBuyAmount();
+    error DevBuyAmountTooLarge();
+    error PermitTokenMismatch();
+    error PermitSpenderMismatch();
+    error PermitAmountTooLow();
+    error PermitExpired();
+    error InvalidDevBuyFunding();
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -138,6 +166,7 @@ contract TokenFactory is Ownable, Pausable {
      * @param _implementation Address of the BondingCurveToken implementation
      * @param _uniswapV2Router Address of Uniswap V2 Router for graduation
      * @param _baseAsset Address of the base asset all tokens will trade against (e.g., JUSD)
+     * @param _permit2 Address of Permit2 for signature-based dev-buy funding
      * @param _feeRecipient Address that receives protocol fees from token graduations
      * @param _initialVirtualBaseReserves Initial virtual base reserves for pricing (must be > 0)
      * @param _initCodeHash Init code hash for Uniswap V2 pair address computation
@@ -146,6 +175,7 @@ contract TokenFactory is Ownable, Pausable {
         address _implementation,
         address _uniswapV2Router,
         address _baseAsset,
+        address _permit2,
         address _feeRecipient,
         uint256 _initialVirtualBaseReserves,
         bytes32 _initCodeHash
@@ -153,6 +183,7 @@ contract TokenFactory is Ownable, Pausable {
         if (_implementation == address(0)) revert InvalidImplementation();
         if (_uniswapV2Router == address(0)) revert InvalidRouter();
         if (_baseAsset == address(0)) revert InvalidBaseAsset();
+        if (_permit2 == address(0)) revert InvalidPermit2();
         if (_feeRecipient == address(0)) revert InvalidFeeRecipient();
         if (_initialVirtualBaseReserves == 0) revert InvalidVirtualBaseReserves();
         if (_initCodeHash == bytes32(0)) revert InvalidInitCodeHash();
@@ -160,6 +191,7 @@ contract TokenFactory is Ownable, Pausable {
         implementation = _implementation;
         uniswapV2Router = _uniswapV2Router;
         baseAsset = _baseAsset;
+        permit2 = IPermit2(_permit2);
         feeRecipient = _feeRecipient;
         initialVirtualBaseReserves = _initialVirtualBaseReserves;
         initCodeHash = _initCodeHash;
@@ -208,24 +240,11 @@ contract TokenFactory is Ownable, Pausable {
         }
     }
 
-    /* ========== EXTERNAL FUNCTIONS ========== */
-
-    /**
-     * @notice Creates a new bonding curve token using minimal proxy pattern
-     * @dev All tokens trade against the factory's base asset (set at deployment)
-     * @dev SECURITY: Enforces max lengths - name (100), symbol (20), metadataURI (1024 bytes)
-     * @dev SECURITY: Name/URI reject control chars (0x00-0x1F) and DEL (0x7F), allow Unicode
-     * @dev SECURITY: Symbol restricted to uppercase ASCII alphanumeric only (A-Z, 0-9)
-     * @param name Name of the token (max 100 chars, allows Unicode, no control chars)
-     * @param symbol Symbol of the token (max 20 chars, A-Z and 0-9 only)
-     * @param metadataURI URI pointing to token metadata JSON (max 1024 bytes, no control chars)
-     * @return token Address of the newly created token
-     */
-    function createToken(
+    function _validateTokenInputs(
         string calldata name,
         string calldata symbol,
         string calldata metadataURI
-    ) external whenNotPaused returns (address token) {
+    ) private pure {
         // Validate name
         if (bytes(name).length == 0) revert InvalidName();
         if (bytes(name).length > MAX_NAME_LENGTH) revert NameTooLong();
@@ -240,7 +259,14 @@ contract TokenFactory is Ownable, Pausable {
         if (bytes(metadataURI).length == 0) revert InvalidMetadataURI();
         if (bytes(metadataURI).length > MAX_METADATA_URI_LENGTH) revert MetadataURITooLong();
         _validatePrintableString(metadataURI);
+    }
 
+    function _deployValidatedToken(
+        string calldata name,
+        string calldata symbol,
+        string calldata metadataURI,
+        address creator
+    ) private returns (address token) {
         // Clone the implementation contract using EIP-1167 minimal proxy
         token = implementation.clone();
 
@@ -258,7 +284,7 @@ contract TokenFactory is Ownable, Pausable {
 
         // Store token information
         tokenInfo[token] = TokenInfo({
-            creator: msg.sender,
+            creator: creator,
             timestamp: uint96(block.timestamp),
             name: name,
             symbol: symbol,
@@ -271,7 +297,7 @@ contract TokenFactory is Ownable, Pausable {
         // Emit event with complete deployment configuration
         emit TokenCreated(
             token,
-            msg.sender,
+            creator,
             name,
             symbol,
             baseAsset,
@@ -279,6 +305,86 @@ contract TokenFactory is Ownable, Pausable {
             feeRecipient,
             metadataURI
         );
+    }
+
+    function _validateDevBuyPermit(
+        IPermit2.PermitSingle calldata permitSingle,
+        uint256 devBuyBaseIn
+    ) private view {
+        if (devBuyBaseIn == 0) revert InvalidDevBuyAmount();
+        if (devBuyBaseIn > type(uint160).max) revert DevBuyAmountTooLarge();
+        if (permitSingle.details.token != baseAsset) revert PermitTokenMismatch();
+        if (permitSingle.spender != address(this)) revert PermitSpenderMismatch();
+        if (permitSingle.details.amount < devBuyBaseIn) revert PermitAmountTooLow();
+        if (permitSingle.details.expiration < block.timestamp || permitSingle.sigDeadline < block.timestamp) {
+            revert PermitExpired();
+        }
+    }
+
+    /* ========== EXTERNAL FUNCTIONS ========== */
+
+    /**
+     * @notice Creates a new bonding curve token using minimal proxy pattern
+     * @dev All tokens trade against the factory's base asset (set at deployment)
+     * @dev SECURITY: Enforces max lengths - name (100), symbol (20), metadataURI (1024 bytes)
+     * @dev SECURITY: Name/URI reject control chars (0x00-0x1F) and DEL (0x7F), allow Unicode
+     * @dev SECURITY: Symbol restricted to uppercase ASCII alphanumeric only (A-Z, 0-9)
+     * @param name Name of the token (max 100 chars, allows Unicode, no control chars)
+     * @param symbol Symbol of the token (max 20 chars, A-Z and 0-9 only)
+     * @param metadataURI URI pointing to token metadata JSON (max 1024 bytes, no control chars)
+     * @return token Address of the newly created token
+     */
+    function createToken(
+        string calldata name,
+        string calldata symbol,
+        string calldata metadataURI
+    ) external whenNotPaused nonReentrant returns (address token) {
+        _validateTokenInputs(name, symbol, metadataURI);
+        token = _deployValidatedToken(name, symbol, metadataURI, msg.sender);
+        BondingCurveToken(token).finalizeLaunch();
+    }
+
+    /**
+     * @notice Creates a new bonding curve token and executes the creator's optional dev buy atomically
+     * @dev Uses Permit2 AllowanceTransfer so creator signs a permit for the factory, then the factory
+     *      transfers JUSD directly into the newly created token and executes the buy before launch finalization.
+     * @param name Name of the token (max 100 chars, allows Unicode, no control chars)
+     * @param symbol Symbol of the token (max 20 chars, A-Z and 0-9 only)
+     * @param metadataURI URI pointing to token metadata JSON (max 1024 bytes, no control chars)
+     * @param devBuyBaseIn Amount of base asset to spend on the creator buy
+     * @param minTokensOut Minimum tokens to receive (slippage protection)
+     * @param permitSingle Permit2 allowance permit authorizing this factory to spend base asset
+     * @param signature Creator's Permit2 signature
+     * @return token Address of the newly created token
+     * @return tokensOut Amount of tokens received by the creator
+     */
+    function createTokenWithDevBuyPermit(
+        string calldata name,
+        string calldata symbol,
+        string calldata metadataURI,
+        uint256 devBuyBaseIn,
+        uint256 minTokensOut,
+        IPermit2.PermitSingle calldata permitSingle,
+        bytes calldata signature
+    ) external whenNotPaused nonReentrant returns (address token, uint256 tokensOut) {
+        _validateTokenInputs(name, symbol, metadataURI);
+        _validateDevBuyPermit(permitSingle, devBuyBaseIn);
+
+        permit2.permit(msg.sender, permitSingle, signature);
+
+        token = _deployValidatedToken(name, symbol, metadataURI, msg.sender);
+
+        uint256 tokenBaseBalanceBefore = IERC20(baseAsset).balanceOf(token);
+        permit2.transferFrom(msg.sender, token, uint160(devBuyBaseIn), baseAsset);
+        if (IERC20(baseAsset).balanceOf(token) - tokenBaseBalanceBefore != devBuyBaseIn) {
+            revert InvalidDevBuyFunding();
+        }
+
+        tokensOut = BondingCurveToken(token).factoryDevBuy(msg.sender, devBuyBaseIn, minTokensOut);
+
+        emit DevBuyExecuted(token, msg.sender, devBuyBaseIn, tokensOut);
+
+        BondingCurveToken(token).finalizeLaunch();
     }
 
     /**

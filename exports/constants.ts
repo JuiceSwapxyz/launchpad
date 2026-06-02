@@ -20,6 +20,12 @@ export const LAUNCHPAD_CONSTANTS = {
 
   /** Basis points denominator (10,000 = 100%) */
   BPS_DENOMINATOR: 10_000n,
+
+  /** Maximum creator dev buy as basis points of real bonding curve supply (20%) */
+  MAX_DEV_BUY_BPS: 2_000n,
+
+  /** Maximum creator dev buy token output (20% of curve supply) */
+  MAX_DEV_BUY_TOKENS: (793_100_000n * 10n ** 18n * 2_000n) / 10_000n,
 } as const;
 
 /**
@@ -43,4 +49,5 @@ export const GRADUATION_ECONOMICS = {
 /**
  * Dead address for LP token burns
  */
-export const DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD" as const;
+export const DEAD_ADDRESS =
+  "0x000000000000000000000000000000000000dEaD" as const;

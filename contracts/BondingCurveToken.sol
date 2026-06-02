@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 
@@ -31,6 +32,8 @@ interface ITokenFactory {
  * @dev True fair launch: No admin pause after deployment (permissionless trading)
  */
 contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
+    using SafeERC20 for IERC20;
+
     /* ========== CONSTANTS ========== */
 
     /// @notice Total supply of tokens (1 billion)
@@ -50,6 +53,13 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
 
     /// @notice Basis points denominator
     uint256 public constant BPS_DENOMINATOR = 10_000;
+
+    /// @notice Maximum dev buy as a percentage of the real bonding curve supply (20%)
+    uint256 public constant MAX_DEV_BUY_BPS = 2_000;
+
+    /// @notice Maximum number of tokens that may be bought by the creator during launch
+    uint256 public constant MAX_DEV_BUY_TOKENS =
+        (INITIAL_REAL_TOKEN_RESERVES * MAX_DEV_BUY_BPS) / BPS_DENOMINATOR;
 
     /* ========== STATE VARIABLES ========== */
 
@@ -95,6 +105,12 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     /// @notice Pre-computed Uniswap V2 pair address (for front-running protection)
     address public uniswapPair;
 
+    /// @notice Whether the factory has finalized launch and opened public trading
+    bool public launchFinalized;
+
+    /// @notice Whether the optional factory-controlled dev buy has been executed
+    bool public devBuyExecuted;
+
     /* ========== EVENTS ========== */
 
     /**
@@ -112,6 +128,19 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         uint256 virtualTokenReserves,
         uint256 virtualBaseReserves
     );
+
+    /**
+     * @notice Emitted when the factory-controlled creator buy is executed before public trading opens
+     * @param buyer Address of the token creator receiving the tokens
+     * @param baseIn Amount of base asset spent
+     * @param tokensOut Amount of launchpad tokens received
+     */
+    event DevBuy(address indexed buyer, uint256 baseIn, uint256 tokensOut);
+
+    /**
+     * @notice Emitted when factory finalizes launch and public trading opens
+     */
+    event LaunchFinalized();
 
     /**
      * @notice Emitted when tokens are sold to the bonding curve
@@ -162,6 +191,20 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     error InsufficientReserves();
     error TransferToUniswapPairBlocked();
     error InvalidInitCodeHash();
+    error LaunchNotFinalized();
+    error LaunchAlreadyFinalized();
+    error NotFactory();
+    error InvalidBuyer();
+    error DevBuyAlreadyExecuted();
+    error DevBuyExceedsMax();
+    error InsufficientPrefundedBase();
+
+    /* ========== MODIFIERS ========== */
+
+    modifier onlyFactory() {
+        if (msg.sender != factory) revert NotFactory();
+        _;
+    }
 
     /* ========== INITIALIZATION ========== */
 
@@ -231,6 +274,8 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         virtualBaseReserves = initialVirtualBase_;
         realTokenReserves = INITIAL_REAL_TOKEN_RESERVES;
         realBaseReserves = 0;
+        launchFinalized = false;
+        devBuyExecuted = false;
 
         // Mint total supply to this contract
         _mint(address(this), TOTAL_SUPPLY);
@@ -252,52 +297,41 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         nonReentrant
         returns (uint256 tokensOut)
     {
-        if (graduated) revert AlreadyGraduated();
-        if (canGraduate) revert MustGraduateFirst();
-        if (baseIn == 0) revert ZeroAmount();
+        if (!launchFinalized) revert LaunchNotFinalized();
+        tokensOut = _executeBuy(msg.sender, baseIn, minTokensOut, true, 0);
+    }
 
-        // Calculate tokens out using exact pump.fun formula
-        // 1. Deduct 1% fee from input
-        uint256 fee = (baseIn * FEE_BPS) / BPS_DENOMINATOR;
-        uint256 baseInAfterFee = baseIn - fee;
+    /**
+     * @notice Execute the optional creator buy before public trading opens
+     * @dev Callable only by the factory after it has prefunded this token with base asset.
+     * @param buyer Token creator that receives the purchased tokens
+     * @param baseIn Amount of base asset already transferred into this contract
+     * @param minTokensOut Minimum tokens to receive (slippage protection)
+     * @return tokensOut Amount of tokens received
+     */
+    function factoryDevBuy(address buyer, uint256 baseIn, uint256 minTokensOut)
+        external
+        onlyFactory
+        nonReentrant
+        returns (uint256 tokensOut)
+    {
+        if (launchFinalized) revert LaunchAlreadyFinalized();
+        if (devBuyExecuted) revert DevBuyAlreadyExecuted();
 
-        // 2. Apply constant product formula: x * y = k
-        uint256 newVirtualBaseReserves = virtualBaseReserves + baseInAfterFee;
-        uint256 k = virtualBaseReserves * virtualTokenReserves;
-        uint256 newVirtualTokenReserves = k / newVirtualBaseReserves;
+        devBuyExecuted = true;
+        tokensOut = _executeBuy(buyer, baseIn, minTokensOut, false, MAX_DEV_BUY_TOKENS);
 
-        // 3. Calculate tokens out
-        tokensOut = virtualTokenReserves - newVirtualTokenReserves;
+        emit DevBuy(buyer, baseIn, tokensOut);
+    }
 
-        // 4. Safety cap - cannot exceed real reserves
-        if (tokensOut > realTokenReserves) {
-            tokensOut = realTokenReserves;
-        }
-
-        // 5. Validate slippage protection
-        if (tokensOut < minTokensOut) revert InsufficientOutput();
-
-        // Transfer base asset from buyer (check before effects)
-        if (!IERC20(baseAsset).transferFrom(msg.sender, address(this), baseIn)) {
-            revert TransferFailed();
-        }
-
-        // Update reserves (effects before interactions)
-        _updateReserves(
-            newVirtualTokenReserves,
-            newVirtualBaseReserves,
-            -int256(tokensOut),      // Token reserves decrease
-            int256(baseInAfterFee)   // Base reserves increase (after fee)
-        );
-
-        // Transfer tokens to buyer (interactions last)
-        _transfer(address(this), msg.sender, tokensOut);
-
-        // Emit event
-        emit Buy(msg.sender, baseIn, tokensOut, virtualTokenReserves, virtualBaseReserves);
-
-        // Check if graduation conditions met
-        _checkAndGraduate();
+    /**
+     * @notice Finalize token launch and open public trading
+     * @dev Callable only by the factory after token creation and optional dev buy complete.
+     */
+    function finalizeLaunch() external onlyFactory {
+        if (launchFinalized) revert LaunchAlreadyFinalized();
+        launchFinalized = true;
+        emit LaunchFinalized();
     }
 
     /**
@@ -311,6 +345,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         nonReentrant
         returns (uint256 baseOut)
     {
+        if (!launchFinalized) revert LaunchNotFinalized();
         if (graduated) revert AlreadyGraduated();
         if (canGraduate) revert MustGraduateFirst();
         if (tokensIn == 0) revert ZeroAmount();
@@ -348,9 +383,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         );
 
         // Transfer base asset to seller (interactions last)
-        if (!IERC20(baseAsset).transfer(msg.sender, baseOut)) {
-            revert TransferFailed();
-        }
+        IERC20(baseAsset).safeTransfer(msg.sender, baseOut);
 
         // Emit event
         emit Sell(msg.sender, tokensIn, baseOut, virtualTokenReserves, virtualBaseReserves);
@@ -483,6 +516,73 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
     /* ========== INTERNAL FUNCTIONS ========== */
 
     /**
+     * @notice Shared buy execution for public buys and the factory-controlled dev buy
+     * @param buyer Address that pays for public buys or receives tokens for prefunded dev buys
+     * @param baseIn Amount of base asset spent
+     * @param minTokensOut Minimum accepted token output
+     * @param pullBase Whether to transfer base asset from buyer inside this function
+     * @param maxTokensOut Optional output cap, where 0 means uncapped
+     */
+    function _executeBuy(
+        address buyer,
+        uint256 baseIn,
+        uint256 minTokensOut,
+        bool pullBase,
+        uint256 maxTokensOut
+    ) internal returns (uint256 tokensOut) {
+        if (buyer == address(0)) revert InvalidBuyer();
+        if (graduated) revert AlreadyGraduated();
+        if (canGraduate) revert MustGraduateFirst();
+        if (baseIn == 0) revert ZeroAmount();
+
+        // Calculate tokens out using exact pump.fun formula
+        // 1. Deduct 1% fee from input
+        uint256 fee = (baseIn * FEE_BPS) / BPS_DENOMINATOR;
+        uint256 baseInAfterFee = baseIn - fee;
+
+        // 2. Apply constant product formula: x * y = k
+        uint256 newVirtualBaseReserves = virtualBaseReserves + baseInAfterFee;
+        uint256 k = virtualBaseReserves * virtualTokenReserves;
+        uint256 newVirtualTokenReserves = k / newVirtualBaseReserves;
+
+        // 3. Calculate tokens out
+        tokensOut = virtualTokenReserves - newVirtualTokenReserves;
+
+        // 4. Safety cap - cannot exceed real reserves
+        if (tokensOut > realTokenReserves) {
+            tokensOut = realTokenReserves;
+        }
+
+        // 5. Validate launch/dev-buy cap and slippage protection
+        if (maxTokensOut != 0 && tokensOut > maxTokensOut) revert DevBuyExceedsMax();
+        if (tokensOut < minTokensOut) revert InsufficientOutput();
+
+        // Transfer base asset before effects for public buys. Dev buy is prefunded by the factory
+        // through Permit2 so token creation, permit spend, and buy all revert atomically together.
+        if (pullBase) {
+            IERC20(baseAsset).safeTransferFrom(buyer, address(this), baseIn);
+        } else if (IERC20(baseAsset).balanceOf(address(this)) < realBaseReserves + baseIn) {
+            revert InsufficientPrefundedBase();
+        }
+
+        // Update reserves (effects before interactions)
+        _updateReserves(
+            newVirtualTokenReserves,
+            newVirtualBaseReserves,
+            -int256(tokensOut),      // Token reserves decrease
+            int256(baseInAfterFee)   // Base reserves increase (after fee)
+        );
+
+        // Transfer tokens to buyer (interactions last)
+        _transfer(address(this), buyer, tokensOut);
+
+        emit Buy(buyer, baseIn, tokensOut, virtualTokenReserves, virtualBaseReserves);
+
+        // Check if graduation conditions met
+        _checkAndGraduate();
+    }
+
+    /**
      * @notice ERC20 transfer hook - blocks transfers to Uniswap pair before graduation
      * @dev Prevents front-running attacks that could DoS graduation by seeding the pair with wrong ratio
      * @param from Address tokens are transferred from
@@ -563,9 +663,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
 
         // Send protocol fees to fee recipient (before adding liquidity for check-effects-interactions)
         if (accumulatedFees > 0) {
-            if (!IERC20(baseAsset).transfer(feeRecipient, accumulatedFees)) {
-                revert TransferFailed();
-            }
+            IERC20(baseAsset).safeTransfer(feeRecipient, accumulatedFees);
         }
 
         // Get router and factory addresses
@@ -580,7 +678,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
 
         // Approve router to spend tokens and base asset
         _approve(address(this), address(router), RESERVED_FOR_DEX);
-        IERC20(baseAsset).approve(address(router), realBaseReserves);
+        IERC20(baseAsset).forceApprove(address(router), realBaseReserves);
 
         // Add liquidity to Uniswap V2 (only realBaseReserves, fees already sent)
         // Using addLiquidity (not addLiquidityETH) since baseAsset is ERC20
@@ -596,7 +694,7 @@ contract BondingCurveToken is ERC20, ReentrancyGuard, Ownable {
         );
 
         // Burn LP tokens to dead address (permanent lock)
-        IERC20(v2Pair).transfer(
+        IERC20(v2Pair).safeTransfer(
             address(0x000000000000000000000000000000000000dEaD),
             lpTokens
         );

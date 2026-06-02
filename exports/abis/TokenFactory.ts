@@ -18,6 +18,11 @@ export const TokenFactoryABI = [
       },
       {
         internalType: "address",
+        name: "_permit2",
+        type: "address",
+      },
+      {
+        internalType: "address",
         name: "_feeRecipient",
         type: "address",
       },
@@ -34,6 +39,11 @@ export const TokenFactoryABI = [
     ],
     stateMutability: "nonpayable",
     type: "constructor",
+  },
+  {
+    inputs: [],
+    name: "DevBuyAmountTooLarge",
+    type: "error",
   },
   {
     inputs: [],
@@ -78,6 +88,16 @@ export const TokenFactoryABI = [
   },
   {
     inputs: [],
+    name: "InvalidDevBuyAmount",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidDevBuyFunding",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "InvalidFeeRecipient",
     type: "error",
   },
@@ -99,6 +119,11 @@ export const TokenFactoryABI = [
   {
     inputs: [],
     name: "InvalidName",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidPermit2",
     type: "error",
   },
   {
@@ -155,8 +180,64 @@ export const TokenFactoryABI = [
   },
   {
     inputs: [],
+    name: "PermitAmountTooLow",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "PermitExpired",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "PermitSpenderMismatch",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "PermitTokenMismatch",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "ReentrancyGuardReentrantCall",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "SymbolTooLong",
     type: "error",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "creator",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "baseIn",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "tokensOut",
+        type: "uint256",
+      },
+    ],
+    name: "DevBuyExecuted",
+    type: "event",
   },
   {
     anonymous: false,
@@ -410,6 +491,99 @@ export const TokenFactoryABI = [
     type: "function",
   },
   {
+    inputs: [
+      {
+        internalType: "string",
+        name: "name",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "symbol",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "metadataURI",
+        type: "string",
+      },
+      {
+        internalType: "uint256",
+        name: "devBuyBaseIn",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "minTokensOut",
+        type: "uint256",
+      },
+      {
+        components: [
+          {
+            components: [
+              {
+                internalType: "address",
+                name: "token",
+                type: "address",
+              },
+              {
+                internalType: "uint160",
+                name: "amount",
+                type: "uint160",
+              },
+              {
+                internalType: "uint48",
+                name: "expiration",
+                type: "uint48",
+              },
+              {
+                internalType: "uint48",
+                name: "nonce",
+                type: "uint48",
+              },
+            ],
+            internalType: "struct IPermit2.PermitDetails",
+            name: "details",
+            type: "tuple",
+          },
+          {
+            internalType: "address",
+            name: "spender",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "sigDeadline",
+            type: "uint256",
+          },
+        ],
+        internalType: "struct IPermit2.PermitSingle",
+        name: "permitSingle",
+        type: "tuple",
+      },
+      {
+        internalType: "bytes",
+        name: "signature",
+        type: "bytes",
+      },
+    ],
+    name: "createTokenWithDevBuyPermit",
+    outputs: [
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "tokensOut",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
     inputs: [],
     name: "feeRecipient",
     outputs: [
@@ -547,6 +721,19 @@ export const TokenFactoryABI = [
         internalType: "bool",
         name: "",
         type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "permit2",
+    outputs: [
+      {
+        internalType: "contract IPermit2",
+        name: "",
+        type: "address",
       },
     ],
     stateMutability: "view",
