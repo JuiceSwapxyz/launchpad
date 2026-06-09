@@ -375,6 +375,11 @@ contract TokenFactory is Ownable, Pausable, ReentrancyGuard {
         token = _deployValidatedToken(name, symbol, metadataURI, msg.sender);
 
         uint256 tokenBaseBalanceBefore = IERC20(baseAsset).balanceOf(token);
+        // slither-disable-next-line reentrancy-benign
+        // WHY benign: this function is `nonReentrant`, and `permit2` and `baseAsset`
+        // are trusted immutables (no untrusted external call). The balance is read
+        // back immediately and reverts unless exactly `devBuyBaseIn` arrived, so a
+        // fee-on-transfer or partial-transfer token cannot under-fund the dev buy.
         permit2.transferFrom(msg.sender, token, uint160(devBuyBaseIn), baseAsset);
         if (IERC20(baseAsset).balanceOf(token) - tokenBaseBalanceBefore != devBuyBaseIn) {
             revert InvalidDevBuyFunding();

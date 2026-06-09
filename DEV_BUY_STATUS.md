@@ -9,12 +9,27 @@ same transaction as `createToken`, funded by a scoped Permit2 allowance.
   `_validateDevBuyPermit`, the `DevBuyExecuted` event, Permit2 integration
   (`contracts/interfaces/IPermit2.sol`, `contracts/mocks/MockPermit2.sol`) and
   the `BondingCurveToken` dev-buy path — **complete**.
-- **Tests:** full suite green — 148 passing, 0 failing
-  (`npx hardhat test`), including the "Dev Buy Creation" cases: atomic buy via
-  Permit2, create→buy event ordering, the 20% curve-supply cap revert
-  (`DevBuyExceedsMax`) and permit validation.
+- **Tests:** suite green — **129 passing, 19 pending, 0 failing** (`npx hardhat test`).
+  The 19 pending are network-dependent integration tests (skipped without a live
+  node). Covered dev-buy cases include: atomic buy via Permit2, create→buy event
+  ordering, the 20% curve-supply cap revert (`DevBuyExceedsMax`) and permit validation.
 - **Deployed:** **NO.** The upgraded factory exposing
   `createTokenWithDevBuyPermit` is not yet deployed.
+
+## Known defensive branch (pre-deploy hardening)
+
+`BondingCurveToken.factoryDevBuy` has a `if (devBuyExecuted) revert DevBuyAlreadyExecuted()`
+guard with **no direct test** (flagged by Big Brother). It is **unreachable by
+construction** through every factory path: `createToken` finalizes immediately, and
+`createTokenWithDevBuyPermit` calls `factoryDevBuy` exactly once before finalizing — so
+`devBuyExecuted == true && launchFinalized == false` never persists. `initialize` also
+calls `Ownable(factory_).owner()`, so the factory cannot be substituted by an EOA. A
+direct kill-test therefore needs a bespoke clone harness or storage poke; tracked as a
+pre-deploy hardening item rather than forced with a brittle test.
+
+A static-analysis note (`reentrancy-benign` at `TokenFactory.sol` dev-buy funding) is
+annotated inline with a justification: the function is `nonReentrant` and only calls the
+trusted `permit2`/`baseAsset` immutables, with a strict balance-delta check.
 
 ## Path to live
 
