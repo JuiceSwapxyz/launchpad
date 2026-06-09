@@ -20,6 +20,16 @@ export const BondingCurveTokenABI = [
     type: "error",
   },
   {
+    inputs: [],
+    name: "DevBuyAlreadyExecuted",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "DevBuyExceedsMax",
+    type: "error",
+  },
+  {
     inputs: [
       {
         internalType: "address",
@@ -117,12 +127,22 @@ export const BondingCurveTokenABI = [
   },
   {
     inputs: [],
+    name: "InsufficientPrefundedBase",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "InsufficientReserves",
     type: "error",
   },
   {
     inputs: [],
     name: "InvalidBaseAsset",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "InvalidBuyer",
     type: "error",
   },
   {
@@ -152,7 +172,22 @@ export const BondingCurveTokenABI = [
   },
   {
     inputs: [],
+    name: "LaunchAlreadyFinalized",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "LaunchNotFinalized",
+    type: "error",
+  },
+  {
+    inputs: [],
     name: "MustGraduateFirst",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "NotFactory",
     type: "error",
   },
   {
@@ -190,6 +225,17 @@ export const BondingCurveTokenABI = [
   {
     inputs: [],
     name: "ReentrancyGuardReentrantCall",
+    type: "error",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "token",
+        type: "address",
+      },
+    ],
+    name: "SafeERC20FailedOperation",
     type: "error",
   },
   {
@@ -275,6 +321,31 @@ export const BondingCurveTokenABI = [
       {
         indexed: true,
         internalType: "address",
+        name: "buyer",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "baseIn",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "tokensOut",
+        type: "uint256",
+      },
+    ],
+    name: "DevBuy",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
         name: "pair",
         type: "address",
       },
@@ -292,6 +363,12 @@ export const BondingCurveTokenABI = [
       },
     ],
     name: "Graduated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [],
+    name: "LaunchFinalized",
     type: "event",
   },
   {
@@ -423,6 +500,32 @@ export const BondingCurveTokenABI = [
   {
     inputs: [],
     name: "INITIAL_VIRTUAL_TOKEN_RESERVES",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "MAX_DEV_BUY_BPS",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "MAX_DEV_BUY_TOKENS",
     outputs: [
       {
         internalType: "uint256",
@@ -629,6 +732,19 @@ export const BondingCurveTokenABI = [
   },
   {
     inputs: [],
+    name: "devBuyExecuted",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "factory",
     outputs: [
       {
@@ -638,6 +754,35 @@ export const BondingCurveTokenABI = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "buyer",
+        type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "baseIn",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "minTokensOut",
+        type: "uint256",
+      },
+    ],
+    name: "factoryDevBuy",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "tokensOut",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -651,6 +796,13 @@ export const BondingCurveTokenABI = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "finalizeLaunch",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -760,6 +912,19 @@ export const BondingCurveTokenABI = [
     name: "initialize",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "launchFinalized",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
   {
